@@ -1,0 +1,397 @@
+@import "tailwindcss";
+
+:root {
+  --ink: #18233a;
+  --ink-soft: #485269;
+  --paper: #f2ecdf;
+  --paper-deep: #ded2bc;
+  --night: #101a2b;
+  --night-2: #182640;
+  --gold: #c99b45;
+  --gold-light: #e8ca83;
+  --line: rgba(29, 37, 55, 0.16);
+  --shadow: 0 24px 70px rgba(4, 11, 24, 0.22);
+}
+
+* { box-sizing: border-box; }
+
+html { min-width: 320px; background: var(--night); }
+
+body {
+  margin: 0;
+  color: var(--ink);
+  background:
+    radial-gradient(circle at 18% 18%, rgba(210, 167, 79, 0.12), transparent 28rem),
+    linear-gradient(135deg, #0e1727 0%, #172844 52%, #101927 100%);
+  font-family: "Noto Sans SC", "PingFang SC", "Microsoft YaHei", system-ui, sans-serif;
+  min-height: 100vh;
+}
+
+button, input, select { font: inherit; }
+button { cursor: pointer; }
+button:disabled { cursor: not-allowed; opacity: 0.46; }
+
+.landing-shell {
+  min-height: 100vh;
+  display: grid;
+  grid-template-columns: minmax(0, 1.15fr) minmax(420px, 0.85fr);
+  overflow: hidden;
+}
+
+.landing-copy {
+  position: relative;
+  min-height: 100vh;
+  padding: clamp(3.5rem, 8vw, 8rem);
+  color: #f8f0df;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  isolation: isolate;
+}
+
+.landing-copy::before,
+.landing-copy::after {
+  content: "";
+  position: absolute;
+  inset: 2.2rem;
+  border: 1px solid rgba(224, 190, 118, 0.24);
+  pointer-events: none;
+  z-index: -1;
+}
+
+.landing-copy::after {
+  inset: auto -8rem -11rem auto;
+  width: 34rem;
+  height: 34rem;
+  border: 7rem double rgba(214, 175, 92, 0.065);
+  transform: rotate(20deg);
+}
+
+.eyebrow {
+  color: var(--gold-light);
+  font-size: 0.73rem;
+  font-weight: 800;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+}
+
+.crown-mark {
+  color: var(--gold);
+  font-size: clamp(3.5rem, 8vw, 7rem);
+  line-height: 1;
+  margin: 1.3rem 0 0.2rem;
+  filter: drop-shadow(0 12px 30px rgba(201, 155, 69, 0.25));
+}
+
+.landing-copy h1 {
+  margin: 0;
+  font-family: "Songti SC", "STSong", Georgia, serif;
+  font-size: clamp(4.5rem, 10vw, 9.5rem);
+  font-weight: 900;
+  letter-spacing: -0.065em;
+  line-height: 0.94;
+}
+
+.hero-line {
+  max-width: 38rem;
+  margin: 1.8rem 0 2.7rem;
+  color: rgba(248, 240, 223, 0.68);
+  font-family: "Songti SC", "STSong", Georgia, serif;
+  font-size: clamp(1.1rem, 2vw, 1.35rem);
+  line-height: 1.8;
+}
+
+.rules-ribbon {
+  display: flex;
+  gap: 1.8rem;
+  flex-wrap: wrap;
+  color: rgba(248, 240, 223, 0.74);
+  font-size: 0.82rem;
+}
+
+.rules-ribbon span { display: flex; align-items: center; gap: 0.6rem; }
+.rules-ribbon b { color: var(--gold-light); font-family: Georgia, serif; font-size: 0.72rem; }
+
+.entry-panel {
+  background:
+    linear-gradient(rgba(255, 255, 255, 0.38), rgba(255, 255, 255, 0.38)),
+    repeating-linear-gradient(0deg, transparent 0 5px, rgba(66, 49, 28, 0.025) 5px 6px),
+    var(--paper);
+  padding: clamp(3rem, 7vw, 7rem);
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  box-shadow: -30px 0 80px rgba(0, 0, 0, 0.18);
+}
+
+.panel-heading span { color: #8e6c35; font-size: 0.76rem; letter-spacing: 0.12em; }
+.panel-heading h2 {
+  font-family: "Songti SC", "STSong", Georgia, serif;
+  font-size: clamp(2.2rem, 4vw, 3.5rem);
+  margin: 0.35rem 0 2.3rem;
+}
+
+.entry-panel label {
+  display: flex;
+  flex-direction: column;
+  gap: 0.55rem;
+  color: #5e513e;
+  font-size: 0.78rem;
+  font-weight: 750;
+  letter-spacing: 0.06em;
+}
+
+.entry-panel input, .entry-panel select {
+  width: 100%;
+  border: 1px solid rgba(59, 48, 32, 0.22);
+  border-radius: 3px;
+  background: rgba(255, 255, 255, 0.46);
+  color: var(--ink);
+  padding: 0.92rem 1rem;
+  outline: none;
+  transition: border-color 160ms ease, box-shadow 160ms ease;
+}
+
+.entry-panel input:focus, .entry-panel select:focus {
+  border-color: var(--gold);
+  box-shadow: 0 0 0 3px rgba(201, 155, 69, 0.13);
+}
+
+.create-row, .join-row { display: grid; grid-template-columns: 1fr 1fr; gap: 0.8rem; align-items: end; margin-top: 1rem; }
+.join-row { grid-template-columns: 0.72fr 1.28fr; margin: 0; }
+
+.primary-button, .secondary-button {
+  border: 0;
+  border-radius: 3px;
+  min-height: 3.15rem;
+  padding: 0.8rem 1.2rem;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  transition: transform 150ms ease, box-shadow 150ms ease, background 150ms ease;
+}
+
+.primary-button {
+  color: #fff9e9;
+  background: linear-gradient(135deg, #b98735, #d0a758);
+  box-shadow: 0 10px 24px rgba(148, 103, 29, 0.2);
+}
+.primary-button:hover:not(:disabled) { transform: translateY(-2px); box-shadow: 0 14px 30px rgba(148, 103, 29, 0.28); }
+.secondary-button { background: var(--ink); color: #f8f0df; }
+.secondary-button:hover:not(:disabled) { background: #263552; transform: translateY(-2px); }
+.primary-button.large { min-width: 15rem; min-height: 3.6rem; }
+
+.code-input { text-align: center; text-transform: uppercase; letter-spacing: 0.22em; font-weight: 900; font-family: ui-monospace, monospace; }
+.divider { display: flex; align-items: center; gap: 1rem; color: #8f846f; font-size: 0.7rem; margin: 1.8rem 0; }
+.divider::before, .divider::after { content: ""; height: 1px; background: rgba(68, 55, 36, 0.14); flex: 1; }
+.form-error { margin: 1rem 0 0; color: #a83f35; font-size: 0.82rem; }
+.fine-print { margin: 1.4rem 0 0; color: #8b816f; font-size: 0.72rem; line-height: 1.6; }
+
+.game-shell { min-height: 100vh; background: var(--paper); transition: opacity 120ms ease; }
+.game-shell.is-busy { cursor: progress; }
+
+.game-header {
+  height: 4.7rem;
+  padding: 0 clamp(1rem, 3vw, 3rem);
+  display: grid;
+  grid-template-columns: 1fr auto 1fr;
+  align-items: center;
+  color: #f8f0df;
+  background: var(--night);
+  border-bottom: 1px solid rgba(229, 196, 126, 0.25);
+}
+
+.brand { color: inherit; text-decoration: none; font-family: "Songti SC", "STSong", Georgia, serif; font-weight: 800; font-size: 1.18rem; }
+.brand span { color: var(--gold-light); margin-right: 0.5rem; }
+.round-status { color: rgba(248, 240, 223, 0.72); font-size: 0.78rem; letter-spacing: 0.1em; }
+.round-status span { color: var(--gold-light); border: 1px solid rgba(232, 202, 131, 0.28); padding: 0.3rem 0.55rem; margin-right: 0.6rem; }
+.header-room { justify-self: end; color: rgba(248, 240, 223, 0.7); background: transparent; border: 0; font-size: 0.75rem; }
+
+.player-strip {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
+  background: var(--night-2);
+  color: #fff;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.07);
+}
+
+.player-chip {
+  min-height: 5.2rem;
+  padding: 0.9rem 1.15rem;
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 0.75rem;
+  align-items: center;
+  position: relative;
+  border-right: 1px solid rgba(255, 255, 255, 0.08);
+}
+.player-chip.active::after { content: ""; position: absolute; inset: auto 0 0; height: 3px; background: var(--gold-light); }
+.avatar, .seat-avatar { width: 2.5rem; height: 2.5rem; border-radius: 50%; display: grid; place-items: center; background: #c59a4b; color: #fff9e9; font-family: Georgia, serif; font-weight: 900; }
+.player-name { font-size: 0.82rem; font-weight: 800; }
+.player-name span { color: var(--gold-light); margin-right: 0.3rem; }
+.player-facts { display: flex; gap: 0.65rem; color: rgba(255, 255, 255, 0.6); font-size: 0.69rem; margin-top: 0.32rem; }
+.player-facts span:first-child { color: var(--gold-light); }
+.role-token { grid-column: 1 / -1; color: rgba(255, 255, 255, 0.42); font-size: 0.64rem; padding-left: 3.25rem; margin-top: -0.45rem; }
+
+.center-stage { min-height: calc(100vh - 10rem); padding: clamp(3rem, 7vw, 7rem) clamp(1rem, 5vw, 6rem); text-align: center; background: radial-gradient(circle at 50% 20%, #fffdf7, var(--paper) 63%); }
+.center-stage h2 { margin: 0.6rem 0; font-family: "Songti SC", "STSong", Georgia, serif; font-size: clamp(2.2rem, 5vw, 4rem); }
+.center-stage > p { color: var(--ink-soft); margin: 0 auto 2.4rem; max-width: 39rem; line-height: 1.8; }
+.center-stage .eyebrow { color: #9b7537; }
+
+.room-code { border: 0; background: transparent; color: #a4762d; font: inherit; border-bottom: 2px solid rgba(164, 118, 45, 0.3); padding: 0; }
+.seated-players { max-width: 60rem; display: grid; grid-template-columns: repeat(3, 1fr); gap: 0.8rem; margin: 2rem auto 2.3rem; }
+.seat-card { min-height: 8.5rem; border: 1px solid var(--line); background: rgba(255,255,255,.44); display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 0.45rem; box-shadow: 0 9px 25px rgba(41,34,23,.05); }
+.seat-card small { color: #8d806c; }
+.seat-card.empty { border-style: dashed; color: #a59a87; box-shadow: none; background: transparent; }
+.seat-card.empty span { font-size: 1.6rem; font-weight: 200; }
+.waiting-pulse { color: #8a724a; padding: 1rem; animation: pulse 1.8s infinite; }
+
+.role-grid { max-width: 76rem; display: grid; grid-template-columns: repeat(4, 1fr); gap: 1rem; margin: 2rem auto; text-align: left; }
+.role-card { min-height: 18rem; position: relative; display: flex; flex-direction: column; align-items: flex-start; padding: 1.4rem; border: 1px solid rgba(30,37,51,.18); border-top: 4px solid var(--role-color, #677083); background: rgba(255,255,255,.54); color: var(--ink); box-shadow: 0 14px 32px rgba(30,35,45,.07); transition: transform 160ms ease, box-shadow 160ms ease; }
+.role-card:hover { transform: translateY(-5px); box-shadow: 0 20px 38px rgba(30,35,45,.13); }
+.role-number { color: var(--role-color, #6b7280); font-family: Georgia, serif; font-size: 2.2rem; font-weight: 900; }
+.role-name { font-family: "Songti SC", "STSong", Georgia, serif; font-size: 1.6rem; font-weight: 900; margin-top: 0.4rem; }
+.role-short { color: #8b6c38; font-size: 0.7rem; margin: 0.5rem 0 1rem; }
+.role-description { color: var(--ink-soft); font-size: 0.78rem; line-height: 1.7; }
+.choose-label { color: var(--role-color, #64748b); font-size: 0.72rem; font-weight: 800; margin-top: auto; }
+.waiting-orbit { width: 8rem; height: 8rem; display: grid; place-items: center; border: 1px dashed #ae9261; border-radius: 50%; margin: 4rem auto; animation: spin 8s linear infinite; }
+.waiting-orbit span { color: var(--gold); font-size: 2.5rem; animation: counterspin 8s linear infinite; }
+
+.color-yellow { --role-color: #b48a31; }
+.color-blue { --role-color: #46749c; }
+.color-green { --role-color: #478063; }
+.color-red { --role-color: #a04e45; }
+.color-purple { --role-color: #755990; }
+.color-neutral { --role-color: #5c6475; }
+
+.turn-layout { min-height: calc(100vh - 10rem); display: grid; grid-template-columns: minmax(0, 1fr) 19rem; }
+.table-area { padding: clamp(1.2rem, 3vw, 3rem); min-width: 0; }
+.turn-banner { display: flex; justify-content: space-between; align-items: center; gap: 1rem; padding-bottom: 1.4rem; border-bottom: 1px solid var(--line); }
+.turn-banner > div:first-child > span { color: #8d6c36; font-size: .72rem; letter-spacing: .12em; }
+.turn-banner h2 { margin: .25rem 0 0; font-family: "Songti SC", "STSong", Georgia, serif; font-size: clamp(1.8rem, 4vw, 3rem); }
+.my-role { min-width: 18rem; display: flex; align-items: center; gap: .8rem; border-left: 3px solid var(--role-color); padding: .5rem 1rem; background: rgba(255,255,255,.42); }
+.my-role > b { color: var(--role-color); font: 900 2.2rem/1 Georgia, serif; }
+.my-role span { font-family: "Songti SC", "STSong", Georgia, serif; font-size: 1.1rem; font-weight: 900; }
+.my-role small { display: block; max-width: 15rem; color: var(--ink-soft); font: 400 .65rem/1.45 system-ui, sans-serif; margin-top: .25rem; }
+
+.spectator-message { min-height: 15rem; display: grid; place-items: center; align-content: center; color: #8e816d; }
+.spectator-message span { color: #b58d4a; font-size: 3.2rem; }
+.spectator-message p { margin: .7rem; }
+
+.action-board { padding: 1.4rem 0 2rem; }
+.resource-actions { display: flex; align-items: center; gap: .7rem; padding: 1rem; border: 1px solid var(--line); background: rgba(255,255,255,.42); }
+.resource-actions > div, .section-title > div { display: flex; align-items: center; gap: .7rem; margin-right: auto; }
+.resource-actions h3, .section-title h3 { margin: 0; font-family: "Songti SC", "STSong", Georgia, serif; font-size: 1.05rem; }
+.step-number { width: 1.7rem; height: 1.7rem; border-radius: 50%; display: grid; place-items: center; color: #fff; background: var(--ink); font: 700 .7rem Georgia, serif; }
+.resource-actions button, .ability-panel button, .destroy-list button { border: 1px solid rgba(27,36,54,.18); background: #fffdf8; color: var(--ink); padding: .7rem 1rem; border-radius: 2px; font-size: .78rem; font-weight: 750; }
+.resource-actions button:hover:not(:disabled), .ability-panel button:hover:not(:disabled) { border-color: var(--gold); color: #8a6429; }
+.done-mark { color: #5f7b62; font-size: .72rem; font-weight: 800; }
+
+.ability-panel { margin-top: .8rem; border-left: 3px solid #8b5e4e; background: #ebe1d1; padding: .85rem 1rem; display: flex; align-items: center; gap: 1rem; font-size: .75rem; }
+.target-roles, .destroy-list { display: flex; gap: .4rem; flex-wrap: wrap; }
+.ability-panel.inline { justify-content: space-between; }
+.warlord-panel { align-items: flex-start; flex-direction: column; }
+
+.hand-section { padding: 1.5rem 0; }
+.section-title { display: flex; align-items: center; justify-content: space-between; gap: 1rem; margin-bottom: .9rem; }
+.section-title > span { color: #8c7e68; font-size: .72rem; }
+.card-row { display: grid; grid-template-columns: repeat(auto-fill, minmax(155px, 1fr)); gap: .75rem; }
+.district-card { min-height: 13.5rem; position: relative; display: flex; flex-direction: column; padding: 1rem; overflow: hidden; border: 1px solid rgba(30,37,51,.18); border-top: 4px solid var(--role-color); background: #fffdf8; box-shadow: 0 8px 20px rgba(30,35,45,.06); }
+.district-card::after { content: ""; position: absolute; width: 5rem; height: 5rem; border: 1.5rem solid color-mix(in srgb, var(--role-color) 10%, transparent); border-radius: 50%; right: -2.6rem; bottom: -2.8rem; }
+.district-cost { width: 2rem; height: 2rem; border-radius: 50%; display: grid; place-items: center; background: var(--role-color); color: white; font: 900 .9rem Georgia, serif; }
+.district-type { position: absolute; top: 1.3rem; right: 1rem; color: var(--role-color); font-size: .58rem; letter-spacing: .08em; font-weight: 800; }
+.district-card h4 { margin: .8rem 0 .45rem; font-family: "Songti SC", "STSong", Georgia, serif; font-size: 1.2rem; }
+.district-card p { margin: 0 0 1rem; color: #77705f; font-size: .66rem; line-height: 1.55; }
+.card-action { position: relative; z-index: 1; margin-top: auto; border: 0; border-top: 1px solid rgba(30,37,51,.13); background: transparent; color: var(--role-color); padding: .65rem 0 0; font-size: .7rem; font-weight: 900; text-align: left; }
+.district-card.compact { min-height: 4.8rem; padding: .55rem; box-shadow: none; }
+.district-card.compact .district-cost { width: 1.5rem; height: 1.5rem; font-size: .7rem; }
+.district-card.compact .district-type { top: .7rem; right: .55rem; }
+.district-card.compact h4 { margin: .5rem 0 0; font-size: .85rem; }
+.empty-hand, .empty-city { color: #9a8e79; border: 1px dashed var(--line); padding: 2rem; font-size: .76rem; }
+.end-turn { width: 100%; border: 0; color: #fff9e9; background: var(--ink); padding: 1rem; font-weight: 900; letter-spacing: .1em; }
+.end-turn:hover:not(:disabled) { background: #263755; }
+
+.cities-section { padding: 1.5rem 0 2rem; border-top: 1px solid var(--line); }
+.city-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); gap: .7rem; }
+.city-panel { border: 1px solid var(--line); background: rgba(255,255,255,.3); padding: .75rem; }
+.city-panel header { display: flex; justify-content: space-between; align-items: center; font-size: .75rem; margin-bottom: .65rem; }
+.city-panel header span { color: #9a7437; font-weight: 800; }
+.mini-districts { display: grid; grid-template-columns: repeat(2, 1fr); gap: .35rem; }
+
+.chronicle { background: #e2d8c7; border-left: 1px solid rgba(43,37,28,.14); padding: 1.5rem 1.1rem; }
+.chronicle-heading { display: flex; align-items: center; gap: .6rem; border-bottom: 1px solid rgba(43,37,28,.15); padding-bottom: .8rem; }
+.chronicle-heading span { color: #a07937; }
+.chronicle h3 { margin: 0; font-family: "Songti SC", "STSong", Georgia, serif; }
+.chronicle ol { list-style: none; padding: 0; margin: 0; }
+.chronicle li { color: #665d50; font-size: .69rem; line-height: 1.55; padding: .7rem .15rem; border-bottom: 1px solid rgba(43,37,28,.08); }
+
+.modal-backdrop { position: fixed; inset: 0; z-index: 20; display: grid; place-items: center; padding: 1rem; background: rgba(9,15,26,.72); backdrop-filter: blur(6px); }
+.draw-modal { width: min(40rem, 100%); background: var(--paper); padding: clamp(1.5rem, 5vw, 3.5rem); box-shadow: var(--shadow); text-align: center; }
+.draw-modal .eyebrow { color: #98723a; }
+.draw-modal h2 { font-family: "Songti SC", "STSong", Georgia, serif; font-size: 2rem; }
+.draw-choices { display: grid; grid-template-columns: repeat(2, 1fr); gap: 1rem; text-align: left; }
+
+.finished-stage { padding-top: 4rem; }
+.victory-crown { color: var(--gold); font-size: 5rem; line-height: 1; }
+.ranking { width: min(42rem, 100%); margin: 2rem auto; display: flex; flex-direction: column; gap: .5rem; }
+.ranking > div { display: grid; grid-template-columns: 2.4rem 1fr auto auto; gap: 1rem; align-items: center; text-align: left; border: 1px solid var(--line); background: rgba(255,255,255,.42); padding: .85rem 1rem; }
+.ranking > div > span { color: #9a7b49; font: 900 1.3rem Georgia, serif; }
+.ranking > div > small { color: #8f826d; }
+.ranking > div > b { color: #9a6f2d; }
+.ranking .winner { border-color: var(--gold); background: #fff9e8; transform: scale(1.02); }
+
+.toast { position: fixed; z-index: 30; top: 5.4rem; left: 50%; transform: translateX(-50%); max-width: calc(100vw - 2rem); color: #fff; background: #8e4138; box-shadow: 0 14px 34px rgba(81,31,25,.28); padding: .75rem 1rem; font-size: .78rem; display: flex; gap: 1rem; align-items: center; }
+.toast button { border: 0; background: transparent; color: #fff; font-size: 1.1rem; }
+.loading-screen { min-height: 100vh; display: grid; place-items: center; align-content: center; gap: 1rem; color: #f8f0df; }
+.loading-screen span { color: var(--gold); font-size: 4rem; animation: pulse 1.5s infinite; }
+.loading-screen button { border: 1px solid rgba(255,255,255,.3); background: transparent; color: #fff; padding: .6rem 1rem; }
+
+@keyframes pulse { 50% { opacity: .45; } }
+@keyframes spin { to { transform: rotate(360deg); } }
+@keyframes counterspin { to { transform: rotate(-360deg); } }
+
+@media (max-width: 980px) {
+  .landing-shell { grid-template-columns: 1fr; }
+  .landing-copy { min-height: auto; padding: 5rem 2rem; }
+  .entry-panel { min-height: 35rem; padding: 3rem 2rem; }
+  .role-grid { grid-template-columns: repeat(2, 1fr); }
+  .turn-layout { grid-template-columns: 1fr; }
+  .chronicle { border-left: 0; border-top: 1px solid rgba(43,37,28,.14); }
+  .chronicle ol { display: grid; grid-template-columns: repeat(2, 1fr); column-gap: 1rem; }
+}
+
+@media (max-width: 680px) {
+  .landing-copy { padding: 4rem 1.3rem; }
+  .landing-copy::before { inset: .75rem; }
+  .landing-copy h1 { font-size: 4.4rem; }
+  .entry-panel { padding: 2.5rem 1.3rem; }
+  .create-row, .join-row { grid-template-columns: 1fr; }
+  .game-header { height: auto; min-height: 4.4rem; grid-template-columns: 1fr auto; gap: .5rem; padding: .7rem 1rem; }
+  .round-status { display: none; }
+  .header-room { font-size: .64rem; }
+  .player-strip { display: flex; overflow-x: auto; }
+  .player-chip { min-width: 200px; }
+  .center-stage { padding: 3rem 1rem; }
+  .seated-players { grid-template-columns: repeat(2, 1fr); }
+  .role-grid { grid-template-columns: 1fr; }
+  .role-card { min-height: 14rem; }
+  .table-area { padding: 1rem; }
+  .turn-banner { align-items: flex-start; flex-direction: column; }
+  .my-role { width: 100%; min-width: 0; }
+  .resource-actions { align-items: stretch; flex-direction: column; }
+  .resource-actions > div { margin-right: 0; }
+  .ability-panel { align-items: stretch; flex-direction: column; }
+  .card-row { display: flex; overflow-x: auto; scroll-snap-type: x mandatory; padding-bottom: .6rem; }
+  .card-row .district-card { min-width: 70vw; scroll-snap-align: start; }
+  .city-grid { grid-template-columns: 1fr; }
+  .chronicle ol { grid-template-columns: 1fr; }
+  .draw-choices { gap: .55rem; }
+  .draw-modal { padding: 1.2rem; }
+  .draw-modal .district-card { min-height: 12rem; }
+  .ranking > div { grid-template-columns: 2rem 1fr auto; }
+  .ranking > div > small { display: none; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { scroll-behavior: auto !important; animation-duration: .01ms !important; animation-iteration-count: 1 !important; transition-duration: .01ms !important; }
+}
+
