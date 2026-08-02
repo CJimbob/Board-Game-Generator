@@ -1,23 +1,31 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import {
+  addBotPlayer,
   buildDistrict,
+  claimHost,
   chooseRole,
   createDistrictDeck,
   createGameState,
   currentPickerId,
   endTurn,
+  entrustPlayerToBot,
   joinGame,
+  leaveGame,
   playerScoreBreakdown,
   processBots,
   publicGameView,
+  removeLobbyPlayer,
+  restorePlayerSeat,
   startGame,
   takeGold,
+  transferHost,
   activateRoleAbility,
   type DistrictCard,
   type GameState,
 } from "../lib/game.ts";
 import { BASIC_DISTRICTS, ROLES, RULESETS, UNIQUE_DISTRICTS } from "../lib/rules.ts";
+import { DISTRICT_EN, ROLE_EN, RULESET_EN, localizedDistrict, localizedRole } from "../lib/i18n.ts";
 
 function twoPlayerGame(rulesetKey = "first_game") {
   const { state, host } = createGameState("TEST", "甲", 0, rulesetKey);
@@ -172,4 +180,65 @@ test("four-to-seven player rooms can opt into rank nine", () => {
   assert.equal(state.players.length, 4);
   assert.equal(state.cast.length, 9);
   assert.equal(state.cast.at(-1)?.key, "artist");
+});
+
+test("host can manage lobby seats and transfer control", () => {
+  const { state, host } = createGameState("HOST", "房主", 0);
+  const guest = joinGame(state, "客人");
+  const bot = addBotPlayer(state, host.id);
+  assert.equal(state.players.length, 3);
+  removeLobbyPlayer(state, host.id, bot.id);
+  assert.equal(state.players.length, 2);
+  transferHost(state, host.id, guest.id);
+  assert.equal(state.hostId, guest.id);
+  claimHost(state, host.id);
+  assert.equal(state.hostId, host.id);
+});
+
+test("a departed player can be entrusted to AI and recover the same seat", () => {
+  const { state, host } = createGameState("BACK", "房主", 1);
+  startGame(state, host.id);
+  const result = leaveGame(state, host.id);
+  assert.equal(result.removed, false);
+  assert.equal(host.isBot, true);
+  const restored = restorePlayerSeat(state, host.id);
+  assert.equal(restored.isBot, false);
+  assert.match(restored.token, /^secret_/);
+});
+
+test("host departure transfers control and a later human can reclaim a bot-only lobby", () => {
+  const { state, host } = createGameState("HAND", "房主", 1);
+  const guest = joinGame(state, "客人");
+  leaveGame(state, host.id);
+  assert.equal(state.hostId, guest.id);
+
+  const botLobby = createGameState("BOTS", "临时房主", 1).state;
+  const departedHost = botLobby.players[0];
+  leaveGame(botLobby, departedHost.id);
+  assert.equal(botLobby.players.every((player) => player.isBot), true);
+  const newcomer = joinGame(botLobby, "新房主");
+  assert.equal(botLobby.hostId, newcomer.id);
+  assert.equal(botLobby.crownPlayerId, newcomer.id);
+});
+
+test("host can entrust an offline seat without revealing private access data", () => {
+  const { state, host } = createGameState("SAFE", "房主", 0);
+  const guest = joinGame(state, "掉线者");
+  guest.recoveryHash = "hashed-secret";
+  startGame(state, host.id);
+  entrustPlayerToBot(state, host.id, guest.id);
+  const view = publicGameView(state, host.id, { [host.id]: { online: true, lastSeenAt: "now" } });
+  const publicGuest = view.players.find((player) => player.id === guest.id)!;
+  assert.equal(publicGuest.isBot, true);
+  assert.equal(publicGuest.isOnline, true);
+  assert.equal("token" in publicGuest, false);
+  assert.equal("recoveryHash" in publicGuest, false);
+});
+
+test("English mode covers every role, district, and ruleset", () => {
+  assert.deepEqual(Object.keys(ROLE_EN).sort(), ROLES.map((role) => role.key).sort());
+  assert.deepEqual(Object.keys(DISTRICT_EN).sort(), [...BASIC_DISTRICTS, ...UNIQUE_DISTRICTS].map((district) => district.key).sort());
+  assert.deepEqual(Object.keys(RULESET_EN).sort(), RULESETS.map((ruleset) => ruleset.key).sort());
+  assert.equal(localizedRole(ROLES[0], "en").name, "Assassin");
+  assert.equal(localizedDistrict(BASIC_DISTRICTS[0], "en").name, "Manor");
 });

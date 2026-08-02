@@ -1,27 +1,45 @@
 import { NextRequest, NextResponse } from "next/server";
 import {
+  activateDistrictAbility,
+  activateRankEightAbility,
+  activateRoleAbility,
+  addBotPlayer,
   buildDistrict,
   chooseRole,
+  claimHost,
   createGameState,
   destroyDistrict,
   drawDistrictChoices,
   endTurn,
+  entrustPlayerToBot,
   joinGame,
   keepDistrictCard,
+  leaveGame,
   processBots,
   publicGameView,
+  removeLobbyPlayer,
   resolveBlackmail,
   resolveTheater,
   restartGame,
+  restorePlayerSeat,
   startGame,
   takeGold,
   takeRoleIncome,
-  activateDistrictAbility,
-  activateRankEightAbility,
-  activateRoleAbility,
+  transferHost,
   type GameState,
+  type PlayerState,
 } from "@/lib/game";
-import { insertRoom, loadRoom, saveRoom } from "@/db/rooms";
+import {
+  cleanupExpiredRooms,
+  deletePlayerMetadata,
+  enforceRateLimit,
+  insertRoom,
+  isPlayerOffline,
+  loadPresence,
+  loadRoomRecord,
+  saveRoom,
+  touchPresence,
+} from "@/db/rooms";
 
 export const dynamic = "force-dynamic";
 
@@ -34,6 +52,7 @@ type ActionBody = {
   includeRankNine?: boolean;
   playerId?: string;
   token?: string;
+  recoveryCode?: string;
   roleId?: number;
   roleKey?: string;
   targetRole?: number;
@@ -56,27 +75,63 @@ function cleanCode(value: string | null | undefined) {
   return (value ?? "").trim().toUpperCase().replace(/[^A-Z0-9]/g, "").slice(0, 4);
 }
 
-function randomRoomCode() {
+function cleanRecoveryCode(value: string | null | undefined) {
+  return (value ?? "").trim().toUpperCase().replace(/[^A-Z0-9]/g, "").slice(0, 10);
+}
+
+function randomCode(length: number) {
   const alphabet = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
   let code = "";
-  for (let index = 0; index < 4; index += 1) {
+  for (let index = 0; index < length; index += 1) {
     code += alphabet[Math.floor(Math.random() * alphabet.length)];
   }
   return code;
 }
 
+async function hashRecoveryCode(code: string) {
+  const bytes = new TextEncoder().encode(code);
+  const digest = await crypto.subtle.digest("SHA-256", bytes);
+  return Array.from(new Uint8Array(digest), (byte) => byte.toString(16).padStart(2, "0")).join("");
+}
+
+function clientKey(request: NextRequest) {
+  return request.headers.get("cf-connecting-ip")
+    ?? request.headers.get("x-forwarded-for")?.split(",")[0]?.trim()
+    ?? "unknown";
+}
+
+function credentials(request: NextRequest, body?: ActionBody) {
+  const authorization = request.headers.get("authorization") ?? "";
+  const bearer = authorization.startsWith("Bearer ") ? authorization.slice(7) : "";
+  return {
+    playerId: request.headers.get("x-player-id") ?? body?.playerId ?? "",
+    token: bearer || body?.token || "",
+  };
+}
+
 function authenticate(state: GameState, playerId?: string, token?: string) {
   const player = state.players.find((candidate) => candidate.id === playerId);
   if (!player || player.isBot || !token || player.token !== token) {
-    throw new Error("房间身份已经失效，请重新加入。 ");
+    throw new Error("房间身份已经失效，请使用恢复码返回座位。 ");
   }
   return player;
 }
 
-function ok(state: GameState, playerId: string, token?: string) {
+async function responseFor(
+  state: GameState,
+  playerId: string,
+  session?: { token: string; recoveryCode?: string },
+) {
+  await touchPresence(state.code, playerId);
+  const presence = await loadPresence(state.code);
   return NextResponse.json({
-    game: publicGameView(state, playerId),
-    session: token ? { code: state.code, playerId, token } : undefined,
+    game: publicGameView(state, playerId, presence),
+    session: session ? {
+      code: state.code,
+      playerId,
+      token: session.token,
+      recoveryCode: session.recoveryCode,
+    } : undefined,
   });
 }
 
@@ -85,19 +140,29 @@ function failure(error: unknown, status = 400) {
   return NextResponse.json({ error: message }, { status });
 }
 
+function requireCurrentRoom(record: Awaited<ReturnType<typeof loadRoomRecord>>) {
+  if (!record) throw new Error("没有找到这个房间，房间可能已超过 7 天未活动。 ");
+  if (!record.state.rulesetKey) throw new Error("这个房间来自旧版本，请回到首页创建新房间。 ");
+  return record;
+}
+
+async function saveOrConflict(state: GameState, revision: number) {
+  if (!await saveRoom(state, revision)) {
+    throw new Error("牌桌刚刚被另一项操作更新，请同步后重试。 ");
+  }
+}
+
 export async function GET(request: NextRequest) {
   try {
     const code = cleanCode(request.nextUrl.searchParams.get("code"));
-    const playerId = request.nextUrl.searchParams.get("playerId") ?? "";
-    const token = request.nextUrl.searchParams.get("token") ?? "";
     if (code.length !== 4) throw new Error("请输入四位房间码。 ");
-    const state = await loadRoom(code);
-    if (!state) return failure(new Error("没有找到这个房间。"), 404);
-    if (!state.rulesetKey) {
-      return failure(new Error("这个房间来自旧版本，请回到首页创建新房间。"), 409);
-    }
-    authenticate(state, playerId, token);
-    return ok(state, playerId);
+    const { state } = requireCurrentRoom(await loadRoomRecord(code));
+    const session = credentials(request, {
+      playerId: request.nextUrl.searchParams.get("playerId") ?? undefined,
+      token: request.nextUrl.searchParams.get("token") ?? undefined,
+    });
+    authenticate(state, session.playerId, session.token);
+    return await responseFor(state, session.playerId);
   } catch (error) {
     return failure(error);
   }
@@ -106,11 +171,16 @@ export async function GET(request: NextRequest) {
 export async function POST(request: NextRequest) {
   try {
     const body = (await request.json()) as ActionBody;
+    const ip = clientKey(request);
+
     if (body.action === "create") {
+      await enforceRateLimit(`entry:${ip}`, 20);
+      await cleanupExpiredRooms();
       const name = (body.name ?? "").trim();
       if (!name) throw new Error("请先输入昵称。 ");
       for (let attempt = 0; attempt < 12; attempt += 1) {
-        const code = randomRoomCode();
+        const code = randomCode(4);
+        const recoveryCode = randomCode(10);
         const { state, host } = createGameState(
           code,
           name,
@@ -118,30 +188,98 @@ export async function POST(request: NextRequest) {
           body.rulesetKey ?? "first_game",
           Boolean(body.includeRankNine),
         );
-        if (await insertRoom(state)) return ok(state, host.id, host.token);
+        host.recoveryHash = await hashRecoveryCode(recoveryCode);
+        if (await insertRoom(state)) {
+          return await responseFor(state, host.id, { token: host.token, recoveryCode });
+        }
       }
       throw new Error("暂时无法生成房间码，请重试。 ");
     }
 
     const code = cleanCode(body.code);
     if (code.length !== 4) throw new Error("请输入四位房间码。 ");
-    const state = await loadRoom(code);
-    if (!state) return failure(new Error("没有找到这个房间。"), 404);
-    if (!state.rulesetKey) {
-      return failure(new Error("这个房间来自旧版本，请回到首页创建新房间。"), 409);
-    }
 
     if (body.action === "join") {
-      const player = joinGame(state, body.name ?? "");
-      await saveRoom(state);
-      return ok(state, player.id, player.token);
+      await enforceRateLimit(`entry:${ip}`, 20);
+      const recoveryCode = randomCode(10);
+      const recoveryHash = await hashRecoveryCode(recoveryCode);
+      for (let attempt = 0; attempt < 3; attempt += 1) {
+        const { state, revision } = requireCurrentRoom(await loadRoomRecord(code));
+        const player = joinGame(state, body.name ?? "");
+        player.recoveryHash = recoveryHash;
+        if (await saveRoom(state, revision)) {
+          return await responseFor(state, player.id, { token: player.token, recoveryCode });
+        }
+      }
+      return failure(new Error("刚好有多人同时入座，请再点一次加入。"), 409);
     }
 
-    const player = authenticate(state, body.playerId, body.token);
+    if (body.action === "recover") {
+      await enforceRateLimit(`recovery:${ip}`, 12);
+      const recoveryCode = cleanRecoveryCode(body.recoveryCode);
+      if (recoveryCode.length !== 10) throw new Error("请输入 10 位恢复码。 ");
+      const recoveryHash = await hashRecoveryCode(recoveryCode);
+      const { state, revision } = requireCurrentRoom(await loadRoomRecord(code));
+      const seat = state.players.find((player) => player.recoveryHash === recoveryHash);
+      if (!seat) throw new Error("恢复码不正确，或这个座位已经被移除。 ");
+      const player = restorePlayerSeat(state, seat.id);
+      await saveOrConflict(state, revision);
+      return await responseFor(state, player.id, { token: player.token, recoveryCode });
+    }
+
+    const record = requireCurrentRoom(await loadRoomRecord(code));
+    const { state, revision } = record;
+    const session = credentials(request, body);
+    const player = authenticate(state, session.playerId, session.token);
+    await enforceRateLimit(`action:${ip}:${player.id}`, 120);
+    await touchPresence(state.code, player.id);
+
+    if (body.action === "refreshRecovery") {
+      const recoveryCode = randomCode(10);
+      player.recoveryHash = await hashRecoveryCode(recoveryCode);
+      state.version += 1;
+      state.updatedAt = new Date().toISOString();
+      await saveOrConflict(state, revision);
+      return await responseFor(state, player.id, { token: player.token, recoveryCode });
+    }
+
+    let removedPlayer: PlayerState | null = null;
     switch (body.action) {
       case "start":
         startGame(state, player.id);
         break;
+      case "addBot":
+        addBotPlayer(state, player.id);
+        break;
+      case "removePlayer":
+        removedPlayer = removeLobbyPlayer(state, player.id, body.targetPlayerId ?? "");
+        break;
+      case "transferHost":
+        transferHost(state, player.id, body.targetPlayerId ?? "");
+        break;
+      case "claimHost": {
+        if (state.hostId === player.id) throw new Error("你已经是房主。 ");
+        if (!await isPlayerOffline(state.code, state.hostId, 45)) {
+          throw new Error("房主尚未离线满 45 秒。 ");
+        }
+        claimHost(state, player.id);
+        break;
+      }
+      case "entrust": {
+        const targetPlayerId = body.targetPlayerId ?? "";
+        if (!await isPlayerOffline(state.code, targetPlayerId, 45)) {
+          throw new Error("这位玩家尚未离线满 45 秒。 ");
+        }
+        entrustPlayerToBot(state, player.id, targetPlayerId);
+        break;
+      }
+      case "leaveRoom": {
+        const result = leaveGame(state, player.id);
+        processBots(state);
+        await saveOrConflict(state, revision);
+        await deletePlayerMetadata(state.code, player.id);
+        return NextResponse.json({ left: true, seatPreserved: !result.removed });
+      }
       case "chooseRole":
         chooseRole(state, player.id, body.roleKey ?? Number(body.roleId));
         break;
@@ -204,12 +342,7 @@ export async function POST(request: NextRequest) {
         });
         break;
       case "destroy":
-        destroyDistrict(
-          state,
-          player.id,
-          body.targetPlayerId ?? "",
-          body.districtUid ?? "",
-        );
+        destroyDistrict(state, player.id, body.targetPlayerId ?? "", body.districtUid ?? "");
         break;
       case "endTurn":
         endTurn(state, player.id);
@@ -220,10 +353,13 @@ export async function POST(request: NextRequest) {
       default:
         throw new Error("未知操作。 ");
     }
+
     processBots(state);
-    await saveRoom(state);
-    return ok(state, player.id);
+    await saveOrConflict(state, revision);
+    if (removedPlayer) await deletePlayerMetadata(state.code, removedPlayer.id);
+    return await responseFor(state, player.id);
   } catch (error) {
-    return failure(error);
+    const message = error instanceof Error ? error.message : "";
+    return failure(error, message.includes("另一项操作") ? 409 : 400);
   }
 }

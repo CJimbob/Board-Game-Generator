@@ -28,6 +28,7 @@ export type PendingChoice =
 export type PlayerState = {
   id: string;
   token: string;
+  recoveryHash?: string;
   name: string;
   isBot: boolean;
   gold: number;
@@ -246,8 +247,100 @@ export function joinGame(state: GameState, name: string) {
   const player = newPlayer(normalized);
   state.players.push(player);
   addLog(state, `${player.name} 加入了房间。`);
+  const currentHost = state.players.find((candidate) => candidate.id === state.hostId);
+  if (!currentHost || currentHost.isBot) {
+    state.hostId = player.id;
+    state.crownPlayerId = player.id;
+    addLog(state, `${player.name} 接任了房主。`);
+  }
   touch(state);
   return player;
+}
+
+export function addBotPlayer(state: GameState, playerId: string) {
+  if (state.status !== "lobby") throw new Error("游戏开始后不能再添加电脑玩家。 ");
+  if (state.hostId !== playerId) throw new Error("只有房主可以添加电脑玩家。 ");
+  if (state.players.length >= 8) throw new Error("房间已满，最多 8 位玩家。 ");
+  const usedNames = new Set(state.players.map((player) => player.name));
+  const name = BOT_NAMES.find((candidate) => !usedNames.has(candidate)) ?? `守卫${state.players.length}`;
+  const bot = newPlayer(name, true);
+  state.players.push(bot);
+  addLog(state, `${bot.name}（电脑）加入了房间。`);
+  touch(state);
+  return bot;
+}
+
+export function removeLobbyPlayer(state: GameState, playerId: string, targetPlayerId: string) {
+  if (state.status !== "lobby") throw new Error("游戏开始后请改用掉线托管。 ");
+  if (state.hostId !== playerId) throw new Error("只有房主可以移除座位。 ");
+  if (targetPlayerId === playerId) throw new Error("房主请使用“退出牌局”。 ");
+  const target = requirePlayer(state, targetPlayerId);
+  state.players = state.players.filter((player) => player.id !== target.id);
+  addLog(state, `${target.name} 离开了房间。`);
+  touch(state);
+  return target;
+}
+
+export function transferHost(state: GameState, playerId: string, targetPlayerId: string) {
+  if (state.hostId !== playerId) throw new Error("只有房主可以移交房主。 ");
+  const target = requirePlayer(state, targetPlayerId);
+  if (target.isBot) throw new Error("不能把房主移交给电脑玩家。 ");
+  if (target.id === playerId) throw new Error("你已经是房主。 ");
+  state.hostId = target.id;
+  addLog(state, `${target.name} 接任了房主。`);
+  touch(state);
+}
+
+export function claimHost(state: GameState, playerId: string) {
+  const player = requirePlayer(state, playerId);
+  if (player.isBot) throw new Error("电脑玩家不能接任房主。 ");
+  const previous = requirePlayer(state, state.hostId);
+  state.hostId = player.id;
+  addLog(state, `${previous.name} 长时间离线，${player.name} 接任了房主。`);
+  touch(state);
+}
+
+export function entrustPlayerToBot(state: GameState, playerId: string, targetPlayerId: string) {
+  if (state.hostId !== playerId) throw new Error("只有房主可以启用掉线托管。 ");
+  if (targetPlayerId === playerId) throw new Error("房主不能托管自己，请先移交房主或退出。 ");
+  const target = requirePlayer(state, targetPlayerId);
+  if (target.isBot) throw new Error("这个座位已经由电脑托管。 ");
+  if (state.status === "lobby") throw new Error("候场阶段可以直接移除这个座位。 ");
+  target.isBot = true;
+  target.token = "";
+  addLog(state, `${target.name} 的座位暂时交给电脑托管。`);
+  touch(state);
+}
+
+export function restorePlayerSeat(state: GameState, playerId: string) {
+  const player = requirePlayer(state, playerId);
+  player.isBot = false;
+  player.token = randomId("secret");
+  addLog(state, `${player.name} 使用恢复码回到了牌桌。`);
+  touch(state);
+  return player;
+}
+
+export function leaveGame(state: GameState, playerId: string) {
+  const player = requirePlayer(state, playerId);
+  if (state.status === "lobby") {
+    state.players = state.players.filter((candidate) => candidate.id !== player.id);
+    if (state.hostId === player.id) {
+      state.hostId = state.players.find((candidate) => !candidate.isBot)?.id ?? state.players[0]?.id ?? player.id;
+      state.crownPlayerId = state.hostId;
+    }
+    addLog(state, `${player.name} 离开了房间。`);
+    touch(state);
+    return { removed: true, player };
+  }
+  player.isBot = true;
+  player.token = "";
+  if (state.hostId === player.id) {
+    state.hostId = state.players.find((candidate) => candidate.id !== player.id && !candidate.isBot)?.id ?? player.id;
+  }
+  addLog(state, `${player.name} 已离开，电脑接管了这个座位。`);
+  touch(state);
+  return { removed: false, player };
 }
 
 function requirePlayer(state: GameState, playerId: string) {
@@ -1490,7 +1583,11 @@ function publicPendingChoice(state: GameState, viewerId: string) {
   return { type: "blackmail", actorId: choice.actorId };
 }
 
-export function publicGameView(state: GameState, viewerId: string) {
+export function publicGameView(
+  state: GameState,
+  viewerId: string,
+  presence: Record<string, { online: boolean; lastSeenAt: string }> = {},
+) {
   const viewer = requirePlayer(state, viewerId);
   const picker = currentPickerId(state);
   const active = currentPlayerId(state);
@@ -1527,6 +1624,8 @@ export function publicGameView(state: GameState, viewerId: string) {
         id: player.id,
         name: player.name,
         isBot: player.isBot,
+        isOnline: player.isBot || Boolean(presence[player.id]?.online),
+        lastSeenAt: presence[player.id]?.lastSeenAt ?? null,
         gold: player.gold,
         handCount: player.hand.length,
         hand: player.id === viewerId ? player.hand : [],
