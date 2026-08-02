@@ -104,6 +104,15 @@ function Landing({
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
 
+  useEffect(() => {
+    const inviteCode = new URLSearchParams(window.location.search)
+      .get("room")
+      ?.toUpperCase()
+      .replace(/[^A-Z0-9]/g, "")
+      .slice(0, 4);
+    if (inviteCode?.length === 4) setCode(inviteCode);
+  }, []);
+
   async function submit(action: "create" | "join") {
     setBusy(true);
     setError("");
@@ -232,16 +241,23 @@ function Lobby({
 }) {
   const isHost = game.viewerId === game.hostId;
   const [copied, setCopied] = useState(false);
-  async function copyCode() {
-    await navigator.clipboard.writeText(game.code);
+  async function shareInvite() {
+    const url = `${window.location.origin}/?room=${game.code}`;
+    const shareData = {
+      title: "加入我的《王冠之城》房间",
+      text: `房间码 ${game.code}，点击链接加入牌桌。`,
+      url,
+    };
+    if (navigator.share) await navigator.share(shareData);
+    else await navigator.clipboard.writeText(`${shareData.text}\n${url}`);
     setCopied(true);
     window.setTimeout(() => setCopied(false), 1400);
   }
   return (
     <section className="center-stage lobby-stage">
       <div className="eyebrow">等待其他城主</div>
-      <h2>房间 <button className="room-code" onClick={copyCode}>{game.code}</button></h2>
-      <p>{copied ? "已复制房间码" : "把四位房间码发给朋友，他们即可从首页加入。"}</p>
+      <h2>房间 <button className="room-code" onClick={shareInvite}>{game.code}</button></h2>
+      <p>{copied ? "邀请链接已准备好" : "发送邀请链接，朋友打开后只需输入昵称即可加入。"}</p>
       <div className="seated-players">
         {game.players.map((player) => (
           <div key={player.id} className="seat-card">
@@ -254,13 +270,18 @@ function Lobby({
           <div key={index} className="seat-card empty"><span>＋</span><small>空座位</small></div>
         ))}
       </div>
-      {isHost ? (
-        <button className="primary-button large" onClick={() => act("start")} disabled={game.players.length < 2}>
-          开始游戏
+      <div className="invite-actions">
+        <button className="secondary-button large" onClick={shareInvite}>
+          {copied ? "邀请链接已复制" : "邀请朋友加入"}
         </button>
-      ) : (
-        <div className="waiting-pulse">等待房主开始游戏…</div>
-      )}
+        {isHost ? (
+          <button className="primary-button large" onClick={() => act("start")} disabled={game.players.length < 2}>
+            开始游戏
+          </button>
+        ) : (
+          <div className="waiting-pulse">等待房主开始游戏…</div>
+        )}
+      </div>
     </section>
   );
 }
@@ -464,24 +485,50 @@ export function GameClient() {
   const [game, setGame] = useState<Game | null>(null);
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
+  const [connection, setConnection] = useState<"connecting" | "online" | "offline">("connecting");
 
   useEffect(() => {
     const saved = window.localStorage.getItem(STORAGE_KEY);
+    const invitedRoom = new URLSearchParams(window.location.search)
+      .get("room")
+      ?.toUpperCase();
     if (saved) {
-      try { setSession(JSON.parse(saved) as Session); } catch { window.localStorage.removeItem(STORAGE_KEY); }
+      try {
+        const savedSession = JSON.parse(saved) as Session;
+        if (!invitedRoom || invitedRoom === savedSession.code) setSession(savedSession);
+        else window.localStorage.removeItem(STORAGE_KEY);
+      } catch {
+        window.localStorage.removeItem(STORAGE_KEY);
+      }
     }
+  }, []);
+
+  useEffect(() => {
+    const markOnline = () => setConnection("connecting");
+    const markOffline = () => setConnection("offline");
+    window.addEventListener("online", markOnline);
+    window.addEventListener("offline", markOffline);
+    if (!navigator.onLine) markOffline();
+    return () => {
+      window.removeEventListener("online", markOnline);
+      window.removeEventListener("offline", markOffline);
+    };
   }, []);
 
   const refresh = useCallback(async (quiet = false) => {
     if (!session) return;
+    let reachedServer = false;
     try {
       const query = new URLSearchParams(session);
       const response = await fetch(`/api/game?${query}`, { cache: "no-store" });
+      reachedServer = true;
+      setConnection("online");
       const data = (await response.json()) as { game?: Game; error?: string };
       if (!response.ok || !data.game) throw new Error(data.error ?? "同步失败。 ");
       setGame(data.game);
       if (!quiet) setError("");
     } catch (caught) {
+      if (!reachedServer) setConnection("offline");
       if (!quiet) setError(caught instanceof Error ? caught.message : "同步失败。 ");
     }
   }, [session]);
@@ -497,6 +544,7 @@ export function GameClient() {
     window.localStorage.setItem(STORAGE_KEY, JSON.stringify(nextSession));
     setSession(nextSession);
     setGame(nextGame);
+    setConnection("online");
     setError("");
   }
 
@@ -504,16 +552,20 @@ export function GameClient() {
     if (!session || busy) return;
     setBusy(true);
     setError("");
+    let reachedServer = false;
     try {
       const response = await fetch("/api/game", {
         method: "POST",
         headers: { "content-type": "application/json" },
         body: JSON.stringify({ action, ...session, ...payload }),
       });
+      reachedServer = true;
+      setConnection("online");
       const data = (await response.json()) as { game?: Game; error?: string };
       if (!response.ok || !data.game) throw new Error(data.error ?? "操作失败。 ");
       setGame(data.game);
     } catch (caught) {
+      if (!reachedServer) setConnection("offline");
       setError(caught instanceof Error ? caught.message : "操作失败。 ");
     } finally {
       setBusy(false);
@@ -530,6 +582,7 @@ export function GameClient() {
     setSession(null);
     setGame(null);
     setError("");
+    setConnection("connecting");
   }
 
   if (!session) return <Landing onCreated={enter} />;
@@ -540,7 +593,16 @@ export function GameClient() {
       <header className="game-header">
         <a className="brand" href="#" onClick={(event) => { event.preventDefault(); leave(); }}><span>♛</span> 王冠之城</a>
         <div className="round-status"><span>{phaseLabel}</span>{game.round > 0 && `第 ${game.round} 轮`}</div>
-        <button className="header-room" onClick={() => navigator.clipboard.writeText(game.code)}>房间 {game.code} · 点击复制</button>
+        <div className={`network-status ${connection}`}>
+          <i aria-hidden="true" />
+          {connection === "online" ? "在线同步" : connection === "offline" ? "网络中断" : "正在连接"}
+        </div>
+        <button
+          className="header-room"
+          onClick={() => navigator.clipboard.writeText(`${window.location.origin}/?room=${game.code}`)}
+        >
+          房间 {game.code} · 复制邀请
+        </button>
       </header>
       <PlayerStrip game={game} />
       {error && <div className="toast" role="alert">{error}<button onClick={() => setError("")}>×</button></div>}
@@ -551,4 +613,3 @@ export function GameClient() {
     </main>
   );
 }
-

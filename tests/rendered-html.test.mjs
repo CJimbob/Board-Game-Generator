@@ -17,7 +17,9 @@ test("ships the game surface and social preview", async () => {
   assert.match(client, /加入房间/);
   assert.match(client, /chooseRole/);
   assert.match(client, /endTurn/);
+  assert.match(client, /在线同步/);
+  assert.match(client, /navigator\.share/);
+  assert.match(client, /\?room=/);
   assert.match(layout, /\/og\.png/);
   assert.doesNotMatch(page + client + layout + packageJson, /codex-preview|react-loading-skeleton/i);
 });
-
