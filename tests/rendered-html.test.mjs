@@ -15,6 +15,9 @@ test("ships the game surface and social preview", async () => {
   assert.match(client, /王冠之城/);
   assert.match(client, /创建房间/);
   assert.match(client, /加入房间/);
+  assert.match(client, /完整规则书/);
+  assert.match(client, /27 名角色/);
+  assert.match(client, /2–8 人/);
   assert.match(client, /chooseRole/);
   assert.match(client, /endTurn/);
   assert.match(client, /在线同步/);

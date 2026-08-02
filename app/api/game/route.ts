@@ -10,10 +10,15 @@ import {
   keepDistrictCard,
   processBots,
   publicGameView,
+  resolveBlackmail,
+  resolveTheater,
   restartGame,
   startGame,
   takeGold,
-  useRoleAbility,
+  takeRoleIncome,
+  activateDistrictAbility,
+  activateRankEightAbility,
+  activateRoleAbility,
   type GameState,
 } from "@/lib/game";
 import { insertRoom, loadRoom, saveRoom } from "@/db/rooms";
@@ -25,13 +30,26 @@ type ActionBody = {
   code?: string;
   name?: string;
   botCount?: number;
+  rulesetKey?: string;
+  includeRankNine?: boolean;
   playerId?: string;
   token?: string;
   roleId?: number;
+  roleKey?: string;
   targetRole?: number;
+  targetRoleKey?: string;
   cardUid?: string;
+  cardUids?: string[];
   targetPlayerId?: string;
   districtUid?: string;
+  targetDistrictUid?: string;
+  ownDistrictUid?: string;
+  districtColor?: "yellow" | "blue" | "green" | "red" | "purple";
+  mode?: string;
+  amountCards?: number;
+  bribe?: boolean;
+  sacrificeUid?: string;
+  paymentCardUids?: string[];
 };
 
 function cleanCode(value: string | null | undefined) {
@@ -75,6 +93,9 @@ export async function GET(request: NextRequest) {
     if (code.length !== 4) throw new Error("请输入四位房间码。 ");
     const state = await loadRoom(code);
     if (!state) return failure(new Error("没有找到这个房间。"), 404);
+    if (!state.rulesetKey) {
+      return failure(new Error("这个房间来自旧版本，请回到首页创建新房间。"), 409);
+    }
     authenticate(state, playerId, token);
     return ok(state, playerId);
   } catch (error) {
@@ -90,7 +111,13 @@ export async function POST(request: NextRequest) {
       if (!name) throw new Error("请先输入昵称。 ");
       for (let attempt = 0; attempt < 12; attempt += 1) {
         const code = randomRoomCode();
-        const { state, host } = createGameState(code, name, body.botCount ?? 1);
+        const { state, host } = createGameState(
+          code,
+          name,
+          body.botCount ?? 1,
+          body.rulesetKey ?? "first_game",
+          Boolean(body.includeRankNine),
+        );
         if (await insertRoom(state)) return ok(state, host.id, host.token);
       }
       throw new Error("暂时无法生成房间码，请重试。 ");
@@ -100,6 +127,9 @@ export async function POST(request: NextRequest) {
     if (code.length !== 4) throw new Error("请输入四位房间码。 ");
     const state = await loadRoom(code);
     if (!state) return failure(new Error("没有找到这个房间。"), 404);
+    if (!state.rulesetKey) {
+      return failure(new Error("这个房间来自旧版本，请回到首页创建新房间。"), 409);
+    }
 
     if (body.action === "join") {
       const player = joinGame(state, body.name ?? "");
@@ -113,7 +143,10 @@ export async function POST(request: NextRequest) {
         startGame(state, player.id);
         break;
       case "chooseRole":
-        chooseRole(state, player.id, Number(body.roleId));
+        chooseRole(state, player.id, body.roleKey ?? Number(body.roleId));
+        break;
+      case "theater":
+        resolveTheater(state, player.id, body.targetPlayerId, body.roleKey);
         break;
       case "takeGold":
         takeGold(state, player.id);
@@ -125,10 +158,50 @@ export async function POST(request: NextRequest) {
         keepDistrictCard(state, player.id, body.cardUid ?? "");
         break;
       case "build":
-        buildDistrict(state, player.id, body.cardUid ?? "");
+        buildDistrict(state, player.id, body.cardUid ?? "", {
+          mode: body.mode as "normal" | "framework" | "necropolis" | undefined,
+          sacrificeUid: body.sacrificeUid,
+          paymentCardUids: body.paymentCardUids,
+        });
         break;
       case "ability":
-        useRoleAbility(state, player.id, body.targetRole);
+        activateRoleAbility(state, player.id, {
+          mode: body.mode,
+          targetRoleKey: body.targetRoleKey ?? (
+            body.targetRole
+              ? state.cast.find((role) => role.rank === body.targetRole)?.key
+              : undefined
+          ),
+          targetPlayerId: body.targetPlayerId,
+          districtColor: body.districtColor,
+          cardUid: body.cardUid,
+          cardUids: body.cardUids,
+          targetDistrictUid: body.targetDistrictUid,
+          ownDistrictUid: body.ownDistrictUid,
+          amountCards: body.amountCards,
+        });
+        break;
+      case "roleIncome":
+        takeRoleIncome(state, player.id);
+        break;
+      case "blackmail":
+        resolveBlackmail(state, player.id, Boolean(body.bribe));
+        break;
+      case "rankEight":
+        activateRankEightAbility(
+          state,
+          player.id,
+          body.targetPlayerId ?? "",
+          body.targetDistrictUid ?? body.districtUid ?? "",
+          body.ownDistrictUid,
+        );
+        break;
+      case "districtAbility":
+        activateDistrictAbility(state, player.id, body.districtUid ?? "", {
+          cardUid: body.cardUid,
+          targetPlayerId: body.targetPlayerId,
+          targetDistrictUid: body.targetDistrictUid,
+        });
         break;
       case "destroy":
         destroyDistrict(
@@ -154,4 +227,3 @@ export async function POST(request: NextRequest) {
     return failure(error);
   }
 }
-
