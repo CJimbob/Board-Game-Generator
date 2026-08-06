@@ -17,6 +17,7 @@ import {
   processBots,
   publicGameView,
   removeLobbyPlayer,
+  resolveWarrant,
   restartGame,
   restorePlayerSeat,
   startGame,
@@ -337,4 +338,54 @@ test("English mode covers every role, district, and ruleset", () => {
   assert.deepEqual(Object.keys(RULESET_EN).sort(), RULESETS.map((ruleset) => ruleset.key).sort());
   assert.equal(localizedRole(ROLES[0], "en").name, "Assassin");
   assert.equal(localizedDistrict(BASIC_DISTRICTS[0], "en").name, "Manor");
+});
+
+test("Magistrate chooses all three warrants and decides whether to confiscate the first paid build", () => {
+  const { state, host } = createGameState("WRNT", "执法官玩家", 0, "ambitious");
+  const builder = joinGame(state, "建造者");
+  const magistrate = ROLES.find((role) => role.key === "magistrate")!;
+  const wizard = ROLES.find((role) => role.key === "wizard")!;
+  state.status = "turns";
+  state.cast = RULESETS.find((ruleset) => ruleset.key === "ambitious")!.roleKeys.map((key) => ROLES.find((role) => role.key === key)!);
+  state.currentRank = magistrate.rank;
+  state.currentRoleKey = magistrate.key;
+  state.activePlayerId = host.id;
+  host.roleKeys = [magistrate.key];
+
+  activateRoleAbility(state, host.id, {
+    targetRoleKey: wizard.key,
+    targetRoleKeys: [wizard.key, "patrician", "architect"],
+  });
+  assert.deepEqual(Object.keys(state.warrants).sort(), ["architect", "patrician", "wizard"]);
+  assert.equal(state.warrants.wizard, true);
+  assert.equal(state.warrants.patrician, false);
+  assert.deepEqual(publicGameView(state, builder.id).warrantRoleKeys.sort(), ["architect", "patrician", "wizard"]);
+
+  const district: DistrictCard = { uid: "warrant-build", key: "palace", name: "宫殿", color: "yellow", cost: 5 };
+  state.currentRank = wizard.rank;
+  state.currentRoleKey = wizard.key;
+  state.activePlayerId = builder.id;
+  builder.roleKeys = [wizard.key];
+  builder.resourceTaken = true;
+  builder.gold = 7;
+  builder.hand = [district];
+
+  buildDistrict(state, builder.id, district.uid);
+  assert.equal(builder.gold, 2);
+  assert.equal(builder.city.length, 0);
+  assert.equal(publicGameView(state, builder.id).pendingChoice?.type, "waiting");
+  const magistrateChoice = publicGameView(state, host.id).pendingChoice;
+  assert.equal(magistrateChoice?.type, "warrant");
+  if (magistrateChoice?.type === "warrant") {
+    assert.equal(magistrateChoice.signed, true);
+    assert.equal(magistrateChoice.canConfiscate, true);
+  }
+
+  resolveWarrant(state, host.id, true);
+  assert.equal(builder.gold, 7);
+  assert.equal(builder.city.length, 0);
+  assert.equal(builder.buildsThisTurn, 1);
+  assert.equal(host.city.at(-1)?.uid, district.uid);
+  assert.equal(state.pendingChoice, null);
+  assert.equal(state.warrantResolved, true);
 });

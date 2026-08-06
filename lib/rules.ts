@@ -29,7 +29,7 @@ export type RulesetDefinition = {
 export const ROLES: RoleDefinition[] = [
   { key: "assassin", rank: 1, name: "刺客", short: "让一个身份从今夜消失", color: "neutral", description: "点名另一角色；该角色本轮不公开身份并跳过整个回合。" },
   { key: "witch", rank: 1, name: "女巫", short: "借走别人的身份与能力", color: "neutral", description: "取得资源后魅惑一名角色；对方只取得资源，你随后以该角色身份完成自己的回合。" },
-  { key: "magistrate", rank: 1, name: "执法官", short: "一纸密令征收新城区", color: "neutral", description: "秘密签发一张真拘票与两张假票；真目标首次付费建造时，城区可能被你没收。" },
+  { key: "magistrate", rank: 1, name: "执法官", short: "一纸密令征收新城区", color: "neutral", description: "把一张真拘票与两张假票分别放到三个不同角色旁。真目标首次付费建造后，你可揭票：退还其费用，并把该城区免费建入自己的城市；你已有同名城区时不能没收。无论是否没收，该城区都计入目标的建造上限。" },
   { key: "thief", rank: 2, name: "盗贼", short: "在钟声响起前下手", color: "neutral", description: "点名另一角色；对方出场时，你夺取其全部金币。" },
   { key: "spy", rank: 2, name: "间谍", short: "从手牌颜色读出财富", color: "neutral", description: "查看一名玩家手牌并声明类型；每张匹配牌令你抽一张牌，并尽量从对方拿一金币。" },
   { key: "blackmailer", rank: 2, name: "勒索者", short: "真假威胁都足以令人犹豫", color: "neutral", description: "秘密威胁两名角色；被威胁者取得资源后可交出一半金币消除威胁，否则可能失去全部金币。" },

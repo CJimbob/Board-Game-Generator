@@ -20,6 +20,7 @@ import {
   publicGameView,
   removeLobbyPlayer,
   resolveBlackmail,
+  resolveWarrant,
   resolveTheater,
   restartGame,
   restorePlayerSeat,
@@ -61,6 +62,7 @@ type ActionBody = {
   roleKey?: string;
   targetRole?: number;
   targetRoleKey?: string;
+  targetRoleKeys?: string[];
   cardUid?: string;
   cardUids?: string[];
   targetPlayerId?: string;
@@ -71,6 +73,7 @@ type ActionBody = {
   mode?: string;
   amountCards?: number;
   bribe?: boolean;
+  reveal?: boolean;
   sacrificeUid?: string;
   paymentCardUids?: string[];
 };
@@ -350,6 +353,7 @@ export async function POST(request: NextRequest) {
               ? state.cast.find((role) => role.rank === body.targetRole)?.key
               : undefined
           ),
+          targetRoleKeys: body.targetRoleKeys,
           targetPlayerId: body.targetPlayerId,
           districtColor: body.districtColor,
           cardUid: body.cardUid,
@@ -364,6 +368,9 @@ export async function POST(request: NextRequest) {
         break;
       case "blackmail":
         resolveBlackmail(state, player.id, Boolean(body.bribe));
+        break;
+      case "warrant":
+        resolveWarrant(state, player.id, Boolean(body.reveal));
         break;
       case "rankEight":
         activateRankEightAbility(

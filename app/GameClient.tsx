@@ -1,6 +1,7 @@
 "use client";
 
-import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
+import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { createPortal } from "react-dom";
 import {
   COLOR_NAMES,
   ROLES,
@@ -60,7 +61,17 @@ type Player = {
 type PendingChoice =
   | { type: "blackmail"; actorId: string }
   | { type: "wizard"; actorId: string; targetPlayerId: string; targetName: string; cards: District[] }
-  | { type: "seer"; actorId: string; remainingPlayerIds: string[]; targetName: string };
+  | { type: "seer"; actorId: string; remainingPlayerIds: string[]; targetName: string }
+  | { type: "waiting"; actorId: string; actorName: string; choiceType: string }
+  | {
+      type: "warrant";
+      actorId: string;
+      builderId: string;
+      builderName: string;
+      card: District;
+      signed: boolean;
+      canConfiscate: boolean;
+    };
 
 type Game = {
   code: string;
@@ -83,6 +94,7 @@ type Game = {
   allRoles: RoleDefinition[];
   allUniqueDistricts: District[];
   taxPool: number;
+  warrantRoleKeys: string[];
   pendingChoice: PendingChoice | null;
   assassinatedRoleKey: string | null;
   robbedRoleKey: string | null;
@@ -199,6 +211,74 @@ function citySize(player: Player) {
   return player.city.reduce((sum, district) => sum + (district.key === "monument" ? 2 : 1), 0);
 }
 
+type ReferencePosition = { left: number; top: number; above: boolean };
+
+function ReferenceLink({ label, heading, meta, description, className = "" }: {
+  label: ReactNode;
+  heading: string;
+  meta?: string;
+  description: string;
+  className?: string;
+}) {
+  const triggerRef = useRef<HTMLButtonElement>(null);
+  const [position, setPosition] = useState<ReferencePosition | null>(null);
+  const show = useCallback(() => {
+    const trigger = triggerRef.current;
+    if (!trigger) return;
+    const rect = trigger.getBoundingClientRect();
+    const width = Math.min(304, window.innerWidth - 24);
+    const left = Math.min(window.innerWidth - width / 2 - 12, Math.max(width / 2 + 12, rect.left + rect.width / 2));
+    const above = window.innerHeight - rect.bottom < 190 && rect.top > window.innerHeight - rect.bottom;
+    setPosition({ left, top: above ? rect.top - 8 : rect.bottom + 8, above });
+  }, []);
+  const hide = useCallback(() => setPosition(null), []);
+  return <>
+    <button
+      ref={triggerRef}
+      type="button"
+      className={`reference-link ${className}`}
+      title={`${heading}${meta ? ` · ${meta}` : ""}\n${description}`}
+      aria-expanded={Boolean(position)}
+      onMouseEnter={show}
+      onMouseLeave={hide}
+      onFocus={show}
+      onBlur={hide}
+      onClick={(event) => { event.stopPropagation(); if (position) hide(); else show(); }}
+    >{label}</button>
+    {position && typeof document !== "undefined" && createPortal(
+      <aside className={`reference-floating ${position.above ? "above" : "below"}`} style={{ left: position.left, top: position.top }} role="tooltip">
+        <strong>{heading}</strong>{meta && <small>{meta}</small>}<p>{description}</p>
+      </aside>,
+      document.body,
+    )}
+  </>;
+}
+
+function RoleReferenceLink({ role, label, className }: { role: RoleDefinition; label?: ReactNode; className?: string }) {
+  const { language, text } = useLanguage();
+  const shown = localizedRole(role, language);
+  return <ReferenceLink
+    label={label ?? shown.name}
+    heading={`${shown.rank} · ${shown.name}`}
+    meta={shown.short}
+    description={shown.description || text("此角色没有额外能力。", "This character has no additional power.")}
+    className={className}
+  />;
+}
+
+function DistrictReferenceLink({ district, label, className }: { district: District; label?: ReactNode; className?: string }) {
+  const { language, text } = useLanguage();
+  const shown = localizedDistrict(district, language);
+  const colorNames = language === "en" ? COLOR_NAMES_EN : COLOR_NAMES;
+  return <ReferenceLink
+    label={label ?? shown.name}
+    heading={shown.name}
+    meta={text(`${shown.cost} 金币 · ${colorNames[shown.color]}`, `${shown.cost} gold · ${colorNames[shown.color]}`)}
+    description={shown.text ?? text("基础城区：建造费用也是它的基础终局分数。", "Basic district: its building cost is also its base endgame score.")}
+    className={className}
+  />;
+}
+
 function RulesModal({ onClose }: { onClose: () => void }) {
   const { language, text } = useLanguage();
   const rows = language === "en"
@@ -230,12 +310,12 @@ function RulesModal({ onClose }: { onClose: () => void }) {
         </section>
         <section id="rules-roles" className="rule-section stacked">
           <span className="rule-index">04</span><div><h3>{text("27 名角色", "27 characters")}</h3><div className="rule-card-grid roles-reference">
-            {ROLES.map((source) => { const role = localizedRole(source, language); return <article key={role.key} className={`reference-card color-${role.color}`}><b>{role.rank}</b><h4>{role.name}</h4><p>{role.description}</p></article>; })}
+            {ROLES.map((source) => { const role = localizedRole(source, language); return <article key={role.key} className={`reference-card color-${role.color}`}><b>{role.rank}</b><h4><RoleReferenceLink role={source} /></h4><p>{role.description}</p></article>; })}
           </div></div>
         </section>
         <section id="rules-districts" className="rule-section stacked">
           <span className="rule-index">05</span><div><h3>{text("城区与 30 张独特城区", "Districts and 30 unique districts")}</h3><p>{text("黄色贵族、蓝色宗教、绿色商业、红色军事、紫色独特。牌面费用既是建造价，也是基础分。每局规则套组只混入下列独特城区中的 14 张。", "Yellow is noble, blue religious, green trade, red military, and purple unique. A card's cost is both its building cost and base score. Each ruleset uses 14 of the unique districts below.")}</p><div className="unique-reference">
-            {UNIQUE_DISTRICTS.map((source) => { const district = localizedDistrict(source, language); return <article key={district.key}><span>{district.cost}</span><div><h4>{district.name}</h4><p>{district.text}</p></div></article>; })}
+            {UNIQUE_DISTRICTS.map((source) => { const district = localizedDistrict(source, language); return <article key={district.key}><span>{district.cost}</span><div><h4><DistrictReferenceLink district={{ ...source, uid: `rules-${source.key}` }} /></h4><p>{district.text}</p></div></article>; })}
           </div></div>
         </section>
         <section id="rules-score" className="rule-section">
@@ -262,7 +342,7 @@ function DistrictCard({ district, action, secondaryAction, disabled, secondaryDi
     <article className={`district-card color-${district.color} ${compact ? "compact" : ""}`}>
       <div className="district-cost" aria-label={text(`${district.cost} 金币`, `${district.cost} gold`)}>{district.cost + (district.beautified ? 1 : 0)}</div>
       <div className="district-type">{colorNames[district.color]}{district.beautified ? text(" · 已美化", " · Beautified") : ""}</div>
-      <h4>{shown.name}</h4>
+      <h4><DistrictReferenceLink district={district} /></h4>
       {!compact && <p>{shown.text ?? text("基础城区：建造费用就是它的基础终局分数。", "Basic district: its building cost is also its base endgame score.")}</p>}
       {district.storedCards?.length ? <small className="stored-count">{text(`馆藏 ${district.storedCards.length} 张`, `${district.storedCards.length} stored`)}</small> : null}
       {action && <button className="card-action" onClick={action.onClick} disabled={disabled}>{action.label}</button>}
@@ -313,7 +393,7 @@ function HistoryModal({ historyKey, onClose }: { historyKey: string; onClose: ()
       const rulesetSource = RULESETS.find((ruleset) => ruleset.key === match.rulesetKey) ?? RULESETS[0];
       const ruleset = localizedRuleset(rulesetSource, language);
       const date = new Intl.DateTimeFormat(language === "en" ? "en-GB" : "zh-CN", { dateStyle: "medium", timeStyle: "short" }).format(new Date(match.completedAt));
-      return <article className="history-match" key={match.id}><div className="history-match-summary"><div><span>{date} · {text(`房间 ${match.code}`, `Room ${match.code}`)}</span><h3>♛ {winner?.name ?? text("未知城主", "Unknown leader")}</h3><small>{ruleset.name} · {text(`${match.round} 轮`, `${match.round} rounds`)}</small></div><strong>{text(`${winner?.score ?? 0} 分`, `${winner?.score ?? 0} pts`)}</strong></div><div className="history-ranking">{ranking.map((player, index) => <div key={player.id}><b>{index + 1}</b><span>{player.name}{player.isBot ? " · AI" : ""}</span><strong>{player.score}</strong></div>)}</div><details><summary>{text("查看角色与城市", "View characters and cities")}</summary><div className="history-player-details">{ranking.map((player) => <section key={player.id}><h4>{player.name}</h4><p>{player.roleKeys.map((key) => { const role = ROLES.find((candidate) => candidate.key === key); return role ? localizedRole(role, language).name : key; }).join(language === "en" ? ", " : "、") || text("无公开角色", "No revealed characters")}</p><div>{player.city.map((district, index) => <span key={`${district.key}-${index}`} className={`color-${district.color}`}>{localizedDistrict(district, language).name} · {district.cost + (district.beautified ? 1 : 0)}</span>)}</div></section>)}</div></details></article>;
+      return <article className="history-match" key={match.id}><div className="history-match-summary"><div><span>{date} · {text(`房间 ${match.code}`, `Room ${match.code}`)}</span><h3>♛ {winner?.name ?? text("未知城主", "Unknown leader")}</h3><small>{ruleset.name} · {text(`${match.round} 轮`, `${match.round} rounds`)}</small></div><strong>{text(`${winner?.score ?? 0} 分`, `${winner?.score ?? 0} pts`)}</strong></div><div className="history-ranking">{ranking.map((player, index) => <div key={player.id}><b>{index + 1}</b><span>{player.name}{player.isBot ? " · AI" : ""}</span><strong>{player.score}</strong></div>)}</div><details><summary>{text("查看角色与城市", "View characters and cities")}</summary><div className="history-player-details">{ranking.map((player) => <section key={player.id}><h4>{player.name}</h4><p>{player.roleKeys.length ? player.roleKeys.map((key, index) => { const role = ROLES.find((candidate) => candidate.key === key); return role ? <span key={key}>{index > 0 && (language === "en" ? ", " : "、")}<RoleReferenceLink role={role} /></span> : key; }) : text("无公开角色", "No revealed characters")}</p><div>{player.city.map((district, index) => <span key={`${district.key}-${index}`} className={`color-${district.color}`}><DistrictReferenceLink district={{ ...district, uid: `history-${match.id}-${player.id}-${index}` }} label={`${localizedDistrict(district, language).name} · ${district.cost + (district.beautified ? 1 : 0)}`} /></span>)}</div></section>)}</div></details></article>;
     })}</div>
   </section></div>;
 }
@@ -388,7 +468,7 @@ function PlayerStrip({ game, act }: { game: Game; act: Act }) {
   return <div className="player-strip">{game.players.map((player) => {
     const active = game.currentPlayerId === player.id;
     const online = player.isBot || player.isOnline;
-    return <article key={player.id} className={`player-chip ${active ? "active" : ""} ${online ? "" : "player-offline"}`}><div className="avatar">{player.name.slice(0, 1)}<i className={`presence-dot ${online ? "online" : "offline"}`} title={online ? text("在线", "Online") : text("已掉线", "Offline")} /></div><div><div className="player-name">{player.id === game.crownPlayerId && <span title={text("皇冠", "Crown")}>♛</span>}{player.name}{player.isBot ? " · AI" : ""}</div><div className="player-facts"><span>● {player.gold}</span><span>▰ {player.handCount}</span><span>⌂ {citySize(player)}/{game.completionTarget}</span></div></div><div className="role-token">{player.roleKeys.length ? player.roleKeys.map((key) => { const role = roleFor(game, key, language); return role ? `${role.rank} · ${role.name}` : key; }).join(" / ") : text("身份未公开", "Identity hidden")}</div>{isHost && !player.isBot && player.id !== game.viewerId && game.status !== "lobby" && <button className="inline-manage" onClick={() => act(player.isOnline ? "transferHost" : "entrust", { targetPlayerId: player.id })}>{player.isOnline ? text("移交房主", "Make host") : text("掉线托管", "AI takeover")}</button>}</article>;
+    return <article key={player.id} className={`player-chip ${active ? "active" : ""} ${online ? "" : "player-offline"}`}><div className="avatar">{player.name.slice(0, 1)}<i className={`presence-dot ${online ? "online" : "offline"}`} title={online ? text("在线", "Online") : text("已掉线", "Offline")} /></div><div><div className="player-name">{player.id === game.crownPlayerId && <span title={text("皇冠", "Crown")}>♛</span>}{player.name}{player.isBot ? " · AI" : ""}</div><div className="player-facts"><span>● {player.gold}</span><span>▰ {player.handCount}</span><span>⌂ {citySize(player)}/{game.completionTarget}</span></div></div><div className="role-token">{player.roleKeys.length ? player.roleKeys.map((key, index) => { const role = game.allRoles.find((candidate) => candidate.key === key); return role ? <span key={key}>{index > 0 && " / "}<RoleReferenceLink role={role} label={`${role.rank} · ${localizedRole(role, language).name}`} /></span> : key; }) : text("身份未公开", "Identity hidden")}</div>{isHost && !player.isBot && player.id !== game.viewerId && game.status !== "lobby" && <button className="inline-manage" onClick={() => act(player.isOnline ? "transferHost" : "entrust", { targetPlayerId: player.id })}>{player.isOnline ? text("移交房主", "Make host") : text("掉线托管", "AI takeover")}</button>}</article>;
   })}</div>;
 }
 
@@ -405,7 +485,7 @@ function Lobby({ game, act }: { game: Game; act: Act }) {
     setCopied(true); window.setTimeout(() => setCopied(false), 1400);
   }
   return <section className="center-stage lobby-stage"><div className="eyebrow">{text("等待其他城主", "Waiting for city leaders")} · {ruleset.name}</div><h2>{text("房间", "Room")} <button className="room-code" onClick={shareInvite}>{game.code}</button></h2><p>{copied ? text("邀请链接已准备好", "Invite link ready") : `${ruleset.tagline}${text("。发送链接，朋友输入昵称即可加入。", ". Share the link; friends only need a nickname to join.")}`}</p>
-    <div className="ruleset-preview"><div><span>{text("本局角色", "Characters")}{game.includeRankNine ? text(" · 含可选 9 号", " · optional rank 9 enabled") : ""}</span><strong>{game.roles.map((source) => { const role = localizedRole(source, language); return `${role.rank}.${role.name}`; }).join(" · ")}</strong></div><div><span>{text("独特城区", "Unique districts")}</span><strong>{game.rulesetUniqueKeys.map((key) => { const source = UNIQUE_DISTRICTS.find((district) => district.key === key); return source ? localizedDistrict(source, language).name : null; }).filter(Boolean).join(" · ")}</strong></div></div>
+    <div className="ruleset-preview"><div><span>{text("本局角色", "Characters")}{game.includeRankNine ? text(" · 含可选 9 号", " · optional rank 9 enabled") : ""}</span><strong>{game.roles.map((source, index) => <span key={source.key}>{index > 0 && " · "}<RoleReferenceLink role={source} label={`${source.rank}.${localizedRole(source, language).name}`} /></span>)}</strong></div><div><span>{text("独特城区", "Unique districts")}</span><strong>{game.rulesetUniqueKeys.map((key, index) => { const source = UNIQUE_DISTRICTS.find((district) => district.key === key); return source ? <span key={key}>{index > 0 && " · "}<DistrictReferenceLink district={{ ...source, uid: `lobby-${source.key}` }} /></span> : null; })}</strong></div></div>
     <div className="seated-players">{game.players.map((player) => <div key={player.id} className={`seat-card ${!player.isBot && !player.isOnline ? "player-offline" : ""}`}><span className="seat-avatar">{player.name.slice(0, 1)}<i className={`presence-dot ${player.isBot || player.isOnline ? "online" : "offline"}`} /></span><strong>{player.name}</strong><small>{player.id === game.hostId ? text("房主", "Host") : player.isBot ? text("电脑对手", "AI player") : player.isOnline ? text("已就座", "Seated") : text("已掉线", "Offline")}</small>{isHost && player.id !== game.viewerId && <div className="seat-actions">{!player.isBot && <button onClick={() => act("transferHost", { targetPlayerId: player.id })}>{text("移交房主", "Make host")}</button>}<button onClick={() => act("removePlayer", { targetPlayerId: player.id })}>{text("移除", "Remove")}</button></div>}</div>)}{Array.from({ length: Math.max(0, 8 - game.players.length) }).map((_, index) => <div key={index} className="seat-card empty"><span>＋</span><small>{text("空座位", "Open seat")}</small></div>)}</div>
     {isHost && game.players.length < 8 && <button className="add-bot-button" onClick={() => act("addBot")}>＋ {text("添加电脑玩家", "Add AI player")}</button>}
     {!isHost && host && !host.isBot && !host.isOnline && <button className="claim-host-button" onClick={() => act("claimHost")}>{text("房主掉线满 45 秒后接任", "Take over after host is offline for 45 seconds")}</button>}
@@ -440,7 +520,7 @@ function RoundRoleTrack({ game }: { game: Game }) {
     const ownerLabel = owner
       ? isRevealed ? owner.name : owner.id === game.viewerId ? text("你 · 仅你可见", "You · private") : text("身份未公开", "Identity hidden")
       : text("尚未揭晓", "Not revealed");
-    return <li key={source.key} className={`round-role-step ${status} color-${role.color}`}><span className="round-role-rank">{role.rank}</span><div><strong>{role.name}</strong><small>{ownerLabel}</small></div><em>{statusLabel}</em><div className="round-role-effects">{isAssassinated && <span className="effect-assassin">† {text("刺杀", "Assassin")}</span>}{game.robbedRoleKey === source.key && <span className="effect-robbed">● {text("盗窃目标", "Robbery target")}</span>}{game.bewitchedRoleKey === source.key && <span className="effect-bewitched">✦ {text("施法目标", "Bewitched")}</span>}</div></li>;
+    return <li key={source.key} className={`round-role-step ${status} color-${role.color}`}><span className="round-role-rank">{role.rank}</span><div><strong><RoleReferenceLink role={source} /></strong><small>{ownerLabel}</small></div><em>{statusLabel}</em><div className="round-role-effects">{isAssassinated && <span className="effect-assassin">† {text("刺杀", "Assassin")}</span>}{game.robbedRoleKey === source.key && <span className="effect-robbed">● {text("盗窃目标", "Robbery target")}</span>}{game.bewitchedRoleKey === source.key && <span className="effect-bewitched">✦ {text("施法目标", "Bewitched")}</span>}{game.warrantRoleKeys.includes(source.key) && <span className="effect-warrant">▣ {text("覆面拘票", "Warrant")}</span>}</div></li>;
   })}</ol></div></section>;
 }
 
@@ -456,7 +536,7 @@ function DraftTableOverview({ game, onReturn }: { game: Game; onReturn: () => vo
   const myTurn = game.currentPickerId === game.viewerId;
   return <div className="turn-layout draft-table-overview"><section className="table-area"><div className="turn-banner draft-overview-banner"><div><span>{text(`第 ${game.round} 轮 · 秘密选角中`, `Round ${game.round} · Secret draft in progress`)}</span><h2>{myTurn ? text("现在轮到你选角色", "It is your turn to choose") : text("选角期间的牌桌", "The table during the draft")}</h2></div><button className={myTurn ? "primary-button" : "secondary-button"} onClick={onReturn}>{myTurn ? text("继续选角色 →", "Choose a character →") : text("返回选角", "Back to draft")}</button></div>
     <div className="draft-resource-grid" aria-label={text("你的资源", "Your resources")}><article><span>●</span><div><small>{text("金币", "Gold")}</small><strong>{me.gold}</strong></div></article><article><span>▰</span><div><small>{text("手牌", "Cards")}</small><strong>{me.handCount}</strong></div></article><article><span>⌂</span><div><small>{text("城区", "Districts")}</small><strong>{citySize(me)} / {game.completionTarget}</strong></div></article><article><span>♜</span><div><small>{text("已选身份", "Chosen characters")}</small><strong>{me.roleKeys.length}</strong></div></article></div>
-    {me.roleKeys.length > 0 && <div className="draft-private-roles"><span>{text("仅你可见的已选身份", "Your secret chosen characters")}</span><div>{me.roleKeys.map((key) => { const role = roleFor(game, key, language); return role ? <strong key={key} className={`color-${role.color}`}>{role.rank} · {role.name}</strong> : null; })}</div></div>}
+    {me.roleKeys.length > 0 && <div className="draft-private-roles"><span>{text("仅你可见的已选身份", "Your secret chosen characters")}</span><div>{me.roleKeys.map((key) => { const source = game.allRoles.find((role) => role.key === key); const role = roleFor(game, key, language); return source && role ? <strong key={key} className={`color-${role.color}`}><RoleReferenceLink role={source} label={`${role.rank} · ${role.name}`} /></strong> : null; })}</div></div>}
     <section className="hand-section readonly-hand"><div className="section-title"><h3>{text("你的城区牌", "Your district cards")}</h3><span>{text("选角时只能查看，行动阶段才能建造", "View only during the draft; build during your turn")}</span></div>{me.hand.length ? <div className="card-row">{me.hand.map((district) => <DistrictCard key={district.uid} district={district} />)}</div> : <div className="empty-hand">{text("你暂时没有城区牌。", "You have no district cards.")}</div>}</section>
     <section className="cities-section"><div className="section-title"><h3>{text("桌上的城市", "Cities on the table")}</h3><span>{text(`达到 ${game.completionTarget} 座触发终局`, `Reach ${game.completionTarget} districts to trigger the end`)}</span></div><div className="city-grid">{game.players.map((player) => <article className="city-panel" key={player.id}><header><strong>{player.name}</strong><span>{text(`${player.score} 当前分`, `${player.score} current points`)}</span></header><div className="mini-districts">{player.city.map((district) => <DistrictCard key={district.uid} district={district} compact />)}{!player.city.length && <span className="empty-city">{text("尚未建造", "No districts yet")}</span>}</div></article>)}</div></section>
   </section><Chronicle game={game} /></div>;
@@ -470,8 +550,8 @@ function Draft({ game, act }: { game: Game; act: Act }) {
   if (showTable) return <DraftTableOverview game={game} onReturn={() => setShowTable(false)} />;
   return <section className="center-stage draft-stage"><div className="eyebrow">{text(`第 ${game.round} 轮 · 秘密选角`, `Round ${game.round} · Secret draft`)}</div><h2>{myTurn ? text(`选择你的第 ${me.roleKeys.length + 1} 个身份`, `Choose character ${me.roleKeys.length + 1}`) : text("其他玩家正在选择身份", "Another player is choosing")}</h2><p>{myTurn ? text("只有你看得到当前可选角色。2–3 人每轮会各选两个角色。", "Only you can see these choices. With 2–3 players, everyone chooses two characters.") : text("角色会沿皇冠方向依次传递，请留在牌桌。", "The draft passes around the table from the crown holder.")}</p>
     <button className="draft-table-toggle" onClick={() => setShowTable(true)}>← {text("返回牌桌，查看资源与历史", "Return to the table · resources and history")}</button>
-    {game.faceupDiscardedRoleKeys.length > 0 && <div className="faceup-discards">{text("本轮明置弃牌：", "Face-up discards: ")}{game.faceupDiscardedRoleKeys.map((key) => roleFor(game, key, language)?.name).join(language === "en" ? ", " : "、")}</div>}
-    {myTurn ? <div className="role-grid">{game.roles.filter((role) => game.availableRoleKeys.includes(role.key)).map((source) => { const role = localizedRole(source, language); return <button key={role.key} className={`role-card color-${role.color}`} onClick={() => act("chooseRole", { roleKey: role.key })}><span className="role-number">{role.rank}</span><span className="role-name">{role.name}</span><span className="role-short">{role.short}</span><span className="role-description">{role.description}</span><span className="choose-label">{text("秘密选择 →", "Choose secretly →")}</span></button>; })}</div> : <div className="waiting-orbit" aria-label={text("等待其他玩家", "Waiting for another player")}><span>♛</span></div>}
+    {game.faceupDiscardedRoleKeys.length > 0 && <div className="faceup-discards"><strong>{text("本轮明置弃牌", "Face-up discards")}</strong><div className="faceup-discard-list">{game.faceupDiscardedRoleKeys.map((key) => { const source = game.roles.find((candidate) => candidate.key === key); if (!source) return null; const role = localizedRole(source, language); return <article key={key} className={`color-${role.color}`}><b>{role.rank}</b><div><RoleReferenceLink role={source} /><small>{role.short}</small></div></article>; })}</div></div>}
+    {myTurn ? <div className="role-grid">{game.roles.filter((role) => game.availableRoleKeys.includes(role.key)).map((source) => { const role = localizedRole(source, language); return <article key={role.key} className={`role-card color-${role.color}`}><span className="role-number">{role.rank}</span><span className="role-name"><RoleReferenceLink role={source} /></span><span className="role-short">{role.short}</span><span className="role-description">{role.description}</span><button className="choose-label" onClick={() => act("chooseRole", { roleKey: role.key })}>{text("秘密选择 →", "Choose secretly →")}</button></article>; })}</div> : <div className="waiting-orbit" aria-label={text("等待其他玩家", "Waiting for another player")}><span>♛</span></div>}
   </section>;
 }
 
@@ -487,8 +567,13 @@ function PendingChoicePanel({ game, me, act }: { game: Game; me: Player; act: Ac
   const { language, text } = useLanguage();
   const choice = game.pendingChoice;
   if (!choice) return null;
+  if (choice.type === "waiting") return <div className="choice-panel waiting-choice"><strong>{text(`等待 ${choice.actorName} 完成决定`, `Waiting for ${choice.actorName} to decide`)}</strong><p>{choice.choiceType === "warrant" ? text("执法官正在处理本次建造旁的覆面拘票。决定完成前，牌桌会暂停其他操作。", "The Magistrate is resolving the face-down warrant beside this character. Other table actions pause until the decision is complete.") : text("这项秘密选择完成后，牌局会自动继续。", "The game will continue automatically after this private choice.")}</p></div>;
   if (choice.type === "blackmail") return <div className="choice-panel danger-choice"><strong>{text("你受到未揭晓的勒索", "You received a hidden blackmail threat")}</strong><p>{text("交出当前金币的一半（向下取整）可安全移除标记；拒绝则可能失去全部金币。", "Pay half your gold, rounded down, to remove the threat safely. Refuse and you may lose all your gold.")}</p><div><button onClick={() => act("blackmail", { bribe: true })}>{text(`交出 ${Math.floor(me.gold / 2)} 金币`, `Pay ${Math.floor(me.gold / 2)} gold`)}</button><button onClick={() => act("blackmail", { bribe: false })}>{text("拒绝，要求揭晓", "Refuse and reveal")}</button></div></div>;
-  if (choice.type === "wizard") return <div className="choice-panel"><strong>{text(`巫师正在查看 ${choice.targetName} 的手牌`, `Wizard is viewing ${choice.targetName}'s hand`)}</strong><div className="choice-card-list">{choice.cards.map((source) => { const card = localizedDistrict(source, language); return <div key={card.uid}><span>{card.name} · {text(`${card.cost} 金`, `${card.cost} gold`)}</span><button onClick={() => act("ability", { cardUid: card.uid, mode: "take" })}>{text("加入手牌", "Take into hand")}</button><button onClick={() => act("ability", { cardUid: card.uid, mode: "build" })} disabled={me.gold < card.cost}>{text("立即建造", "Build now")}</button></div>; })}</div></div>;
+  if (choice.type === "warrant") {
+    const shown = localizedDistrict(choice.card, language);
+    return <div className={`choice-panel warrant-choice ${choice.signed ? "signed" : "decoy"}`}><strong>{choice.signed ? text("你掌握的是真拘票", "This is the signed warrant") : text("这里放的是假拘票", "This warrant is a decoy")}</strong><p>{text(`${choice.builderName} 已支付建造`, `${choice.builderName} paid to build `)} <DistrictReferenceLink district={choice.card} label={shown.name} />。{choice.signed ? choice.canConfiscate ? text("你可以现在揭票，把城区免费建入自己的城市，并退还对方建造费用。", "You may reveal it now, build the district in your city for free, and refund the builder.") : text("你已有同名城区，规则禁止没收；请放行。", "You already have a district with this name, so it cannot be confiscated.") : text("假拘票不能没收城区，请放行。", "A decoy cannot confiscate the district; let the build continue.")}</p><div>{choice.signed && choice.canConfiscate && <button onClick={() => act("warrant", { reveal: true })}>{text("揭开真票并没收", "Reveal and confiscate")}</button>}<button onClick={() => act("warrant", { reveal: false })}>{text("不揭票，放行建造", "Do not reveal; allow build")}</button></div></div>;
+  }
+  if (choice.type === "wizard") return <div className="choice-panel"><strong>{text(`巫师正在查看 ${choice.targetName} 的手牌`, `Wizard is viewing ${choice.targetName}'s hand`)}</strong><div className="choice-card-list">{choice.cards.map((source) => { const card = localizedDistrict(source, language); return <div key={card.uid}><span><DistrictReferenceLink district={source} label={`${card.name} · ${text(`${card.cost} 金`, `${card.cost} gold`)}`} /></span><button onClick={() => act("ability", { cardUid: card.uid, mode: "take" })}>{text("加入手牌", "Take into hand")}</button><button onClick={() => act("ability", { cardUid: card.uid, mode: "build" })} disabled={me.gold < card.cost}>{text("立即建造", "Build now")}</button></div>; })}</div></div>;
   return <div className="choice-panel"><strong>{text(`先知：归还一张牌给 ${choice.targetName}`, `Seer: return one card to ${choice.targetName}`)}</strong><div className="target-roles">{me.hand.map((card) => <button key={card.uid} onClick={() => act("ability", { cardUid: card.uid })}>{localizedDistrict(card, language).name}</button>)}</div></div>;
 }
 
@@ -499,17 +584,26 @@ function AbilityPanel({ game, me, act }: { game: Game; me: Player; act: Act }) {
   const [targetPlayerId, setTargetPlayerId] = useState(game.players.find((player) => player.id !== me.id)?.id ?? "");
   const [selectedCards, setSelectedCards] = useState<string[]>([]);
   const [ownDistrictUid, setOwnDistrictUid] = useState(me.city[0]?.uid ?? "");
+  const [warrantRoleKeys, setWarrantRoleKeys] = useState<string[]>([]);
+  const [signedWarrantRoleKey, setSignedWarrantRoleKey] = useState("");
   if (!role) return null;
   const others = game.players.filter((player) => player.id !== me.id);
   const targetRoles = game.roles.filter((candidate) => candidate.rank > 1).map((candidate) => localizedRole(candidate, language));
   const target = others.find((player) => player.id === targetPlayerId) ?? others[0];
   const ownDistrict = me.city.find((card) => card.uid === ownDistrictUid);
   const toggleCard = (uid: string) => setSelectedCards((current) => current.includes(uid) ? current.filter((id) => id !== uid) : [...current, uid]);
+  const toggleWarrantRole = (key: string) => setWarrantRoleKeys((current) => {
+    if (current.includes(key)) {
+      if (signedWarrantRoleKey === key) setSignedWarrantRoleKey("");
+      return current.filter((candidate) => candidate !== key);
+    }
+    return current.length < 3 ? [...current, key] : current;
+  });
 
   return <div className="ability-stack">
-    <PendingChoicePanel game={game} me={me} act={act} />
     {INCOME_ROLES.has(role.key) && <div className="ability-panel inline"><span>{text("角色城区收入可在建造前或后取得。", "Character district income may be taken before or after building.")}</span><button onClick={() => act("roleIncome")} disabled={me.incomeTaken}>{text(`取得${role.key === "patrician" || role.key === "cardinal" ? "城区牌" : "金币"}收入`, `Take ${role.key === "patrician" || role.key === "cardinal" ? "card" : "gold"} income`)}</button></div>}
-    {!game.pendingChoice && !me.abilityUsed && ["assassin", "witch", "magistrate", "thief", "blackmailer"].includes(role.key) && <div className="ability-panel"><strong>{role.name}: {text("秘密点名角色", "secretly name a character")}</strong><div className="target-roles">{targetRoles.map((candidate) => <button key={candidate.key} onClick={() => act("ability", { targetRoleKey: candidate.key })}>{candidate.rank} · {candidate.name}</button>)}</div></div>}
+    {!game.pendingChoice && !me.abilityUsed && ["assassin", "witch", "thief", "blackmailer"].includes(role.key) && <div className="ability-panel"><strong>{role.name}: {text("秘密点名角色", "secretly name a character")}</strong><div className="target-roles">{targetRoles.map((candidate) => <button key={candidate.key} title={`${candidate.short}\n${candidate.description}`} onClick={() => act("ability", { targetRoleKey: candidate.key })}>{candidate.rank} · {candidate.name}</button>)}</div></div>}
+    {!game.pendingChoice && !me.abilityUsed && role.key === "magistrate" && <div className="ability-panel column-panel warrant-assignment"><strong>{text("执法官：选择三个不同角色放置拘票", "Magistrate: place warrants beside three different characters")}</strong><p>{text(`已选择 ${warrantRoleKeys.length}/3。所有人会看到哪些角色旁有覆面拘票，只有你知道哪张是真的。`, `${warrantRoleKeys.length}/3 selected. Everyone sees the face-down warrants; only you know which one is signed.`)}</p><div className="target-roles">{targetRoles.map((candidate) => { const selected = warrantRoleKeys.includes(candidate.key); return <button key={candidate.key} className={selected ? "selected" : ""} title={`${candidate.short}\n${candidate.description}`} onClick={() => toggleWarrantRole(candidate.key)} disabled={!selected && warrantRoleKeys.length >= 3}>{selected ? "✓ " : ""}{candidate.rank} · {candidate.name}</button>; })}</div>{warrantRoleKeys.length > 0 && <fieldset><legend>{text("指定真拘票（仅你可见）", "Choose the signed warrant (private)")}</legend>{warrantRoleKeys.map((key) => { const candidate = targetRoles.find((targetRole) => targetRole.key === key)!; return <label key={key}><input type="radio" name="signed-warrant" value={key} checked={signedWarrantRoleKey === key} onChange={() => setSignedWarrantRoleKey(key)} />{candidate.rank} · {candidate.name}</label>; })}</fieldset>}<button className="confirm-warrants" onClick={() => act("ability", { targetRoleKey: signedWarrantRoleKey, targetRoleKeys: warrantRoleKeys })} disabled={warrantRoleKeys.length !== 3 || !signedWarrantRoleKey}>{text("秘密放置三张拘票", "Place the three warrants")}</button></div>}
     {!game.pendingChoice && !me.abilityUsed && role.key === "spy" && <div className="ability-panel column-panel"><strong>{text("间谍：选择玩家与城区类型", "Spy: choose a player and district type")}</strong><select value={targetPlayerId} onChange={(event) => setTargetPlayerId(event.target.value)}>{others.map((player) => <option key={player.id} value={player.id}>{player.name}</option>)}</select><div className="target-roles">{Object.entries(colorNames).map(([color, label]) => <button key={color} onClick={() => act("ability", { targetPlayerId: target?.id, districtColor: color })}>{label}</button>)}</div></div>}
     {!game.pendingChoice && !me.abilityUsed && role.key === "magician" && <div className="ability-panel column-panel"><strong>{text("魔术师：交换整手或重抽选中的牌", "Magician: swap hands or redraw selected cards")}</strong><div className="target-roles">{others.map((player) => <button key={player.id} onClick={() => act("ability", { mode: "swap", targetPlayerId: player.id })}>{text(`与 ${player.name} 换整手`, `Swap hands with ${player.name}`)}</button>)}</div><div className="check-cards">{me.hand.map((card) => <label key={card.uid}><input type="checkbox" checked={selectedCards.includes(card.uid)} onChange={() => toggleCard(card.uid)} />{localizedDistrict(card, language).name}</label>)}</div><button onClick={() => act("ability", { mode: "redraw", cardUids: selectedCards })} disabled={!selectedCards.length}>{text("弃掉并等量重抽", "Discard and redraw")}</button></div>}
     {!game.pendingChoice && !me.abilityUsed && role.key === "wizard" && <div className="ability-panel"><strong>{text("巫师：查看一名玩家手牌", "Wizard: view another player's hand")}</strong><div className="target-roles">{others.map((player) => <button key={player.id} onClick={() => act("ability", { targetPlayerId: player.id })} disabled={!player.handCount}>{text("查看", "View")} {player.name}</button>)}</div></div>}
@@ -546,6 +640,7 @@ function Turns({ game, act }: { game: Game; act: Act }) {
   const hasFramework = me.city.find((district) => district.key === "framework");
   return <div className="turn-layout"><section className="table-area"><div className="turn-banner"><div><span>{text(`第 ${game.round} 轮 · 正在叫号 ${game.currentRank}`, `Round ${game.round} · Calling rank ${game.currentRank}`)}</span><h2>{myTurn ? text("轮到你行动", "Your turn") : text(`${active?.name ?? "玩家"} 正在行动`, `${active?.name ?? "Player"} is taking a turn`)}</h2></div>{myTurn && role && <div className={`my-role color-${role.color}`}><b>{role.rank}</b><span>{role.name}<small>{role.description}</small></span></div>}</div>
     {game.privateNotes.length > 0 && <div className="private-notes"><strong>{text("仅你可见", "Only you can see this")}</strong>{game.privateNotes.map((note, index) => <span key={index}>{translatedGameMessage(note, language)}</span>)}</div>}
+    {game.pendingChoice && <PendingChoicePanel game={game} me={me} act={act} />}
     {!myTurn && <div className="spectator-message"><span>♜</span><p>{text("观察城市变化，等待你的角色被叫到。", "Watch the cities change while waiting for your character to be called.")}</p></div>}
     {myTurn && <div className="action-board"><div className="resource-actions"><div><span className="step-number">1</span><h3>{text("选择资源", "Choose resources")}</h3></div><button onClick={() => act("takeGold")} disabled={me.resourceTaken}>● {text("取金币", "Take gold")}</button><button onClick={() => act("drawCards")} disabled={me.resourceTaken}>▰ {text("抽牌", "Draw cards")}</button>{me.resourceTaken && <span className="done-mark">{text("已完成", "Done")}</span>}</div>
       <AbilityPanel game={game} me={me} act={act} /><DistrictAbilitiesPanel game={game} me={me} act={act} />

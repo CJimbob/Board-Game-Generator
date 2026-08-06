@@ -9,7 +9,7 @@ type RulesetCopy = Pick<RulesetDefinition, "name" | "tagline">;
 export const ROLE_EN: Record<string, RoleCopy> = {
   assassin: { name: "Assassin", short: "Silence one identity for the night", description: "Name another character. That character stays hidden and skips their entire turn this round." },
   witch: { name: "Witch", short: "Borrow another character's turn", description: "After gathering resources, bewitch a character. They only gather resources; then you resume and finish the turn with their character power." },
-  magistrate: { name: "Magistrate", short: "Seize a newly built district", description: "Secretly place one real warrant and two decoys. When the real target first pays to build, you may confiscate that district." },
+  magistrate: { name: "Magistrate", short: "Seize a newly built district", description: "Place one signed warrant and two decoys beside three different characters. After the signed target first pays to build, you may reveal it, refund the cost, and build that district in your city for free. You cannot confiscate a duplicate; the build still counts toward the target's limit." },
   thief: { name: "Thief", short: "Steal before the bells ring", description: "Name another character. When they are called, take all their gold." },
   spy: { name: "Spy", short: "Read wealth from hand colors", description: "Look at a player's hand and name a district type. Draw one card per match and take up to that much gold from them." },
   blackmailer: { name: "Blackmailer", short: "A threat is powerful even when false", description: "Secretly threaten two characters. After gathering resources, they may pay half their gold or risk losing it all." },
@@ -125,6 +125,11 @@ const ERROR_EN: Record<string, string> = {
   "现在不是你的回合。": "It is not your turn.",
   "请先选择本回合的资源。": "Choose your resources first.",
   "你已经选择过本回合的资源。": "You already chose resources this turn.",
+  "请先完成当前选择。": "Complete the current pending choice first.",
+  "执法官必须选择三个不同的目标角色。": "The Magistrate must choose three different target characters.",
+  "请在三个目标中指定真拘票。": "Choose which of the three targets receives the signed warrant.",
+  "当前没有需要处理的拘票。": "There is no warrant decision to resolve.",
+  "假拘票不能揭开并没收城区。": "A decoy warrant cannot be revealed to confiscate a district.",
   "未知操作。": "Unknown action.",
 };
 
@@ -163,6 +168,10 @@ export function translatedGameMessage(message: string, language: Language) {
     ["已秘密选好角色。", " secretly chose a character."], ["公开身份：", " revealed: "],
     ["接过了皇冠。", " took the crown."], ["从国库取走", " took"], ["金币。", " gold."],
     ["保留了 1 张城区牌。", " kept one district card."], ["建造了", " built "], ["结束回合。", " ended the turn."],
+    ["把三张拘票秘密放到角色标记旁。", " secretly placed three warrants beside character tokens."],
+    ["支付建造", " paid to build "], ["，等待执法官处理其拘票。", "; the Magistrate is resolving the warrant."],
+    ["揭开真拘票，没收了 ", " revealed the signed warrant and confiscated "], ["；建造金币已退还。", "; the building cost was refunded."],
+    ["没有揭开拘票；", " did not reveal the warrant; "], ["揭开真拘票，但因已有同名城区而不能没收；", " revealed the signed warrant but could not confiscate a duplicate; "],
     ["首先完成城市，本轮结束后结算。", " completed a city first; scoring begins after the round."],
     ["最后一个角色的回合结束，城市计分开始。", "The final character finished; city scoring begins."],
     ["本轮遭到刺杀。", " was assassinated this round."], ["号角色没有回应叫号。", " did not answer the call."],

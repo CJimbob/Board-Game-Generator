@@ -23,7 +23,16 @@ export type DistrictCard = DistrictDefinition & {
 export type PendingChoice =
   | { type: "blackmail"; actorId: string; blackmailerId: string; signed: boolean }
   | { type: "wizard"; actorId: string; targetPlayerId: string }
-  | { type: "seer"; actorId: string; remainingPlayerIds: string[] };
+  | { type: "seer"; actorId: string; remainingPlayerIds: string[] }
+  | {
+      type: "warrant";
+      actorId: string;
+      builderId: string;
+      card: DistrictCard;
+      paidAmount: number;
+      countsLimit: boolean;
+      signed: boolean;
+    };
 
 export type PlayerState = {
   id: string;
@@ -93,6 +102,7 @@ export type GameState = {
 export type AbilityPayload = {
   mode?: string;
   targetRoleKey?: string;
+  targetRoleKeys?: string[];
   targetPlayerId?: string;
   districtColor?: DistrictColor;
   cardUid?: string;
@@ -889,13 +899,14 @@ function resolveWizardChoice(state: GameState, player: PlayerState, payload: Abi
     if (player.gold < price) throw new Error("金币不足，无法立即建造。 ");
     player.gold -= price;
     player.goldSpentBuilding += price;
+    state.pendingChoice = null;
     commitBuild(state, player, card, { paid: true, paidAmount: price, countsLimit: false });
   } else {
     player.hand.push(card);
     addLog(state, `${player.name} 从一名玩家手中取走了一张城区牌。`);
+    state.pendingChoice = null;
   }
   player.abilityUsed = true;
-  state.pendingChoice = null;
   return true;
 }
 
@@ -953,10 +964,12 @@ export function activateRoleAbility(state: GameState, playerId: string, payload:
       break;
     }
     case "magistrate": {
-      const target = validateTargetRole(state, normalized.targetRoleKey, 2);
-      state.warrants = { [target.key]: true };
-      const decoys = shuffle(state.cast.filter((candidate) => candidate.rank > 1 && candidate.key !== target.key)).slice(0, 2);
-      for (const decoy of decoys) state.warrants[decoy.key] = false;
+      const targetKeys = [...new Set(normalized.targetRoleKeys ?? [])];
+      if (targetKeys.length !== 3) throw new Error("执法官必须选择三个不同的目标角色。 ");
+      const targets = targetKeys.map((key) => validateTargetRole(state, key, 2));
+      const signedTarget = targets.find((target) => target.key === normalized.targetRoleKey);
+      if (!signedTarget) throw new Error("请在三个目标中指定真拘票。 ");
+      state.warrants = Object.fromEntries(targets.map((target) => [target.key, target.key === signedTarget.key]));
       player.abilityUsed = true;
       addLog(state, "执法官把三张拘票秘密放到角色标记旁。 ");
       break;
@@ -1167,27 +1180,70 @@ function commitBuild(
   card: DistrictCard,
   options: { paid: boolean; paidAmount: number; countsLimit: boolean },
 ) {
-  let recipient = builder;
   const signed = state.currentRoleKey ? state.warrants[state.currentRoleKey] : undefined;
-  if (options.paid && !state.warrantResolved && signed === true) {
-    state.warrantResolved = true;
-    delete state.warrants[state.currentRoleKey!];
-    const magistrate = roleOwner(state, "magistrate");
-    if (magistrate && !magistrate.city.some((district) => district.name === card.name)) {
-      builder.gold += options.paidAmount;
-      builder.goldSpentBuilding -= options.paidAmount;
-      recipient = magistrate;
-      addLog(state, `执法官揭开真拘票，没收了 ${builder.name} 刚建造的${card.name}；建造金币已退还。`);
-    }
+  const magistrate = roleOwner(state, "magistrate");
+  if (options.paid && signed !== undefined && !state.warrantResolved && magistrate) {
+    state.pendingChoice = {
+      type: "warrant",
+      actorId: magistrate.id,
+      builderId: builder.id,
+      card,
+      paidAmount: options.paidAmount,
+      countsLimit: options.countsLimit,
+      signed,
+    };
+    addLog(state, `${builder.name} 支付建造${card.name}，等待执法官处理其拘票。`);
+    return;
   }
+  finishDistrictBuild(state, builder, builder, card, options.countsLimit);
+  addLog(state, `${builder.name} 建造了${card.name}。`);
+}
+
+function finishDistrictBuild(
+  state: GameState,
+  builder: PlayerState,
+  recipient: PlayerState,
+  card: DistrictCard,
+  countsLimit: boolean,
+) {
   recipient.city.push(card);
-  if (options.countsLimit) builder.buildsThisTurn += 1;
+  if (countsLimit) builder.buildsThisTurn += 1;
   taxBuilder(state, recipient);
-  if (recipient === builder) addLog(state, `${builder.name} 建造了${card.name}。`);
   if (citySize(recipient) >= completionTarget(state) && !state.firstCompletedPlayerId) {
     state.firstCompletedPlayerId = recipient.id;
     addLog(state, `${recipient.name} 首先完成城市，本轮结束后结算。`);
   }
+}
+
+export function resolveWarrant(state: GameState, playerId: string, reveal: boolean) {
+  const choice = state.pendingChoice;
+  if (!choice || choice.type !== "warrant" || choice.actorId !== playerId) {
+    throw new Error("当前没有需要处理的拘票。 ");
+  }
+  const magistrate = requirePlayer(state, playerId);
+  const builder = requirePlayer(state, choice.builderId);
+  if (state.currentRoleKey) delete state.warrants[state.currentRoleKey];
+
+  const canConfiscate = choice.signed && !magistrate.city.some((district) => district.name === choice.card.name);
+  if (reveal && !choice.signed) throw new Error("假拘票不能揭开并没收城区。 ");
+
+  if (reveal && canConfiscate) {
+    state.warrantResolved = true;
+    builder.gold += choice.paidAmount;
+    builder.goldSpentBuilding -= choice.paidAmount;
+    finishDistrictBuild(state, builder, magistrate, choice.card, choice.countsLimit);
+    addLog(state, `执法官揭开真拘票，没收了 ${builder.name} 刚建造的${choice.card.name}；建造金币已退还。`);
+  } else {
+    if (choice.signed) state.warrantResolved = true;
+    finishDistrictBuild(state, builder, builder, choice.card, choice.countsLimit);
+    if (reveal) {
+      addLog(state, `执法官揭开真拘票，但因已有同名城区而不能没收；${builder.name} 建造了${choice.card.name}。`);
+    } else {
+      addLog(state, `执法官没有揭开拘票；${builder.name} 建造了${choice.card.name}。`);
+    }
+  }
+  state.pendingChoice = null;
+  touch(state);
 }
 
 function cardinalTrade(state: GameState, player: PlayerState, buildingCard: DistrictCard, shortage: number) {
@@ -1541,7 +1597,19 @@ function botUseAbility(state: GameState, bot: PlayerState) {
   if (!role || bot.abilityUsed || state.pendingChoice) return;
   const target = botTargetPlayer(state, bot);
   try {
-    if (["assassin", "witch", "magistrate", "thief", "blackmailer"].includes(role.key)) {
+    if (role.key === "magistrate") {
+      const signedTarget = botTargetRole(state, bot, role.key);
+      const decoys = state.cast
+        .filter((candidate) => candidate.rank >= 2 && candidate.key !== signedTarget?.key)
+        .sort((a, b) => b.rank - a.rank)
+        .slice(0, 2);
+      if (signedTarget && decoys.length === 2) {
+        activateRoleAbility(state, bot.id, {
+          targetRoleKey: signedTarget.key,
+          targetRoleKeys: [signedTarget.key, ...decoys.map((candidate) => candidate.key)],
+        });
+      }
+    } else if (["assassin", "witch", "thief", "blackmailer"].includes(role.key)) {
       const roleTarget = botTargetRole(state, bot, role.key);
       if (roleTarget) activateRoleAbility(state, bot.id, { targetRoleKey: roleTarget.key });
     } else if (role.key === "spy" && target) {
@@ -1596,6 +1664,14 @@ function botUseAbility(state: GameState, bot: PlayerState) {
 }
 
 function resolveBotPendingChoice(state: GameState, bot: PlayerState) {
+  const warrantChoice = state.pendingChoice?.type === "warrant" ? state.pendingChoice : null;
+  if (warrantChoice?.actorId === bot.id) {
+    const builder = requirePlayer(state, warrantChoice.builderId);
+    const canConfiscate = warrantChoice.signed
+      && !bot.city.some((district) => district.name === warrantChoice.card.name);
+    const valuable = botCardValue(state, bot, warrantChoice.card) >= botCardValue(state, builder, warrantChoice.card);
+    resolveWarrant(state, bot.id, canConfiscate && valuable);
+  }
   if (state.pendingChoice?.type === "blackmail" && state.pendingChoice.actorId === bot.id) {
     resolveBlackmail(state, bot.id, bot.gold >= 5);
   }
@@ -1766,6 +1842,7 @@ function botTurn(state: GameState, bot: PlayerState) {
       break;
     }
   }
+  if (state.pendingChoice) return;
   botUseRankEightAbility(state, bot);
   if (role?.key === "artist") {
     botUseAbility(state, bot);
@@ -1803,6 +1880,12 @@ export function processBots(state: GameState) {
       continue;
     }
     if (state.status === "turns") {
+      if (state.pendingChoice?.type === "warrant") {
+        const magistrate = state.players.find((player) => player.id === state.pendingChoice?.actorId);
+        if (!magistrate?.isBot) break;
+        resolveBotPendingChoice(state, magistrate);
+        continue;
+      }
       const active = state.players.find((player) => player.id === state.activePlayerId);
       if (!active?.isBot) break;
       botTurn(state, active);
@@ -1898,7 +1981,11 @@ export function createMatchHistorySummary(state: GameState): MatchHistorySummary
 
 function publicPendingChoice(state: GameState, viewerId: string) {
   const choice = state.pendingChoice;
-  if (!choice || choice.actorId !== viewerId) return null;
+  if (!choice) return null;
+  if (choice.actorId !== viewerId) {
+    const actor = requirePlayer(state, choice.actorId);
+    return { type: "waiting", actorId: actor.id, actorName: actor.name, choiceType: choice.type };
+  }
   if (choice.type === "wizard") {
     const target = requirePlayer(state, choice.targetPlayerId);
     return { ...choice, targetName: target.name, cards: target.hand };
@@ -1906,6 +1993,15 @@ function publicPendingChoice(state: GameState, viewerId: string) {
   if (choice.type === "seer") {
     const target = requirePlayer(state, choice.remainingPlayerIds[0]);
     return { ...choice, targetName: target.name };
+  }
+  if (choice.type === "warrant") {
+    const builder = requirePlayer(state, choice.builderId);
+    return {
+      ...choice,
+      builderName: builder.name,
+      canConfiscate: choice.signed
+        && !requirePlayer(state, choice.actorId).city.some((district) => district.name === choice.card.name),
+    };
   }
   return { type: "blackmail", actorId: choice.actorId };
 }
@@ -1940,6 +2036,7 @@ export function publicGameView(
     allRoles: ROLES,
     allUniqueDistricts: UNIQUE_DISTRICTS,
     taxPool: state.taxPool,
+    warrantRoleKeys: Object.keys(state.warrants),
     pendingChoice: publicPendingChoice(state, viewerId),
     assassinatedRoleKey: state.assassinatedRoleKey,
     robbedRoleKey: state.robbedRoleKey,
