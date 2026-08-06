@@ -163,6 +163,75 @@ test("computer players can advance every official ruleset without a stalled turn
   }
 });
 
+test("computer players draft roles that match their built district economy", () => {
+  const { state, host } = createGameState("WISE", "策略电脑", 0);
+  const human = joinGame(state, "观察者");
+  host.isBot = true;
+  host.token = "";
+  startGame(state, host.id);
+  host.city = [
+    { uid: "green-a", key: "market", name: "市场", color: "green", cost: 2 },
+    { uid: "green-b", key: "harbor", name: "港口", color: "green", cost: 4 },
+  ];
+  state.draftOrder = [host.id, human.id];
+  state.draftIndex = 0;
+  state.availableRoleKeys = ["bishop", "merchant"];
+  state.facedownRoleKey = null;
+  processBots(state);
+  assert.deepEqual(host.roleKeys, ["merchant"]);
+  assert.equal(state.draftIndex, 1);
+});
+
+test("computer players keep the strongest card from a pending draw", () => {
+  const { state, host } = createGameState("DRAW", "选牌电脑", 0);
+  joinGame(state, "观察者");
+  host.isBot = true;
+  host.token = "";
+  const merchant = ROLES.find((role) => role.key === "merchant")!;
+  state.status = "turns";
+  state.cast = [merchant];
+  state.currentRank = merchant.rank;
+  state.currentRoleKey = merchant.key;
+  state.activePlayerId = host.id;
+  host.roleKeys = [merchant.key];
+  host.resourceTaken = true;
+  host.gold = 0;
+  host.hand = [];
+  host.pendingDraw = [
+    { uid: "plain", key: "temple", name: "神殿", color: "blue", cost: 1 },
+    { uid: "valuable", key: "dragon_gate", name: "龙门", color: "purple", cost: 6 },
+  ];
+  host.pendingDrawMode = "scholar";
+  state.deck = [];
+  processBots(state);
+  assert.ok(host.hand.some((card) => card.uid === "valuable"));
+  assert.ok(!host.hand.some((card) => card.uid === "plain"));
+});
+
+test("rank-eight computer players use legal attacks against a leading city", () => {
+  const { state, host } = createGameState("SIEG", "军阀电脑", 0);
+  const rival = joinGame(state, "领先者");
+  host.isBot = true;
+  host.token = "";
+  const warlord = ROLES.find((role) => role.key === "warlord")!;
+  state.status = "turns";
+  state.cast = [warlord];
+  state.currentRank = warlord.rank;
+  state.currentRoleKey = warlord.key;
+  state.activePlayerId = host.id;
+  host.roleKeys = [warlord.key];
+  host.resourceTaken = true;
+  host.gold = 4;
+  host.hand = [];
+  rival.city = [
+    { uid: "cheap", key: "temple", name: "神殿", color: "blue", cost: 1 },
+    { uid: "valuable", key: "harbor", name: "港口", color: "green", cost: 4 },
+  ];
+  processBots(state);
+  assert.ok(rival.city.some((card) => card.uid === "cheap"));
+  assert.ok(!rival.city.some((card) => card.uid === "valuable"));
+});
+
 test("eight-player games add rank nine and still complete", () => {
   const { state, host } = createGameState("EIGHT", "八人城主", 7, "cunning");
   host.isBot = true;

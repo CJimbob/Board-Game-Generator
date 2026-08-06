@@ -1410,70 +1410,323 @@ export function endTurn(state: GameState, playerId: string) {
 function botTargetPlayer(state: GameState, bot: PlayerState) {
   return state.players
     .filter((player) => player.id !== bot.id)
-    .sort((a, b) => citySize(b) - citySize(a) || b.gold - a.gold)[0];
+    .sort((a, b) => {
+      const threatA = citySize(a) * 12 + playerScore(state, a) + a.gold * 0.4 + a.hand.length * 0.2;
+      const threatB = citySize(b) * 12 + playerScore(state, b) + b.gold * 0.4 + b.hand.length * 0.2;
+      return threatB - threatA;
+    })[0];
+}
+
+function botCardValue(state: GameState, bot: PlayerState, card: DistrictCard) {
+  const alreadyBuilt = bot.city.some((built) => built.uid === card.uid);
+  if (!alreadyBuilt && card.key === "monument" && bot.city.length >= 5) return -100;
+  if (bot.city.some((built) => built.uid !== card.uid && built.name === card.name) && !canBuildDuplicate(state, bot)) return -100;
+  if (card.key === "secret_vault") return 4.5;
+
+  const colors = new Set(bot.city.map((district) => district.color));
+  const remaining = completionTarget(state) - citySize(bot);
+  let value = adjustedCost(card) * 1.25;
+  if (!colors.has(card.color)) value += 3.5;
+  if (remaining <= (card.key === "monument" ? 2 : 1)) value += 18;
+  if (card.cost <= Math.max(2, bot.gold)) value += 1.5;
+
+  const early = remaining >= 4;
+  const uniqueBonuses: Record<string, number> = {
+    gold_mine: early ? 6 : 2,
+    factory: early ? 5 : 1,
+    laboratory: bot.hand.length >= 3 ? 4 : 2,
+    library: early ? 5 : 2,
+    observatory: early ? 4 : 1,
+    quarry: bot.hand.some((other) => other.uid !== card.uid && bot.city.some((built) => built.name === other.name)) ? 5 : 1,
+    school_of_magic: 4,
+    smithy: bot.gold >= 4 ? 3 : 1,
+    stables: 3,
+    thieves_den: bot.hand.length >= 3 ? 4 : 1,
+    imperial_treasury: bot.gold >= 5 ? 4 : 1,
+    map_room: bot.hand.length >= 4 ? 4 : 1,
+    wishing_well: bot.city.filter((district) => district.color === "purple").length * 0.8,
+    framework: early ? 3 : 0,
+    necropolis: bot.city.length >= 2 ? 2 : 0,
+    monument: remaining <= 3 ? 8 : 2,
+  };
+  value += uniqueBonuses[card.key] ?? 0;
+  return value;
+}
+
+function botRoleValue(state: GameState, bot: PlayerState, role: RoleDefinition) {
+  const income = role.color === "neutral" ? 0 : countIncomeDistricts(bot, role.color) * 3;
+  const threat = botTargetPlayer(state, bot);
+  const nearFinish = threat ? citySize(threat) >= completionTarget(state) - 2 : false;
+  const roleBonuses: Record<string, number> = {
+    assassin: nearFinish ? 10 : 5,
+    witch: 5,
+    magistrate: nearFinish ? 8 : 4,
+    thief: 5,
+    spy: 4 + Math.min(3, threat?.hand.length ?? 0),
+    blackmailer: 5,
+    magician: bot.hand.length <= 2 ? 7 : 3,
+    wizard: 4 + Math.min(4, threat?.hand.length ?? 0),
+    seer: state.players.length + 2,
+    king: 5,
+    emperor: 3,
+    patrician: bot.hand.length <= 2 ? 6 : 3,
+    bishop: nearFinish ? 7 : 3,
+    abbot: 4,
+    cardinal: bot.hand.length >= 3 ? 5 : 2,
+    merchant: 6,
+    alchemist: bot.hand.some((card) => card.cost >= 4) ? 6 : 3,
+    trader: 5,
+    architect: bot.hand.length >= 2 ? 7 : 5,
+    navigator: bot.hand.length <= 1 || bot.gold <= 2 ? 6 : 3,
+    scholar: 6,
+    warlord: nearFinish ? 10 : 4,
+    diplomat: nearFinish ? 7 : 3,
+    marshal: nearFinish ? 8 : 4,
+    queen: 3,
+    artist: bot.city.length >= 4 && bot.gold >= 2 ? 6 : 2,
+    tax_collector: state.taxPool + 2,
+  };
+  return income + (roleBonuses[role.key] ?? 0);
+}
+
+function botChooseRole(state: GameState, bot: PlayerState, options: string[]) {
+  return options
+    .map((key) => getRole(key))
+    .filter((role): role is RoleDefinition => Boolean(role))
+    .sort((a, b) => botRoleValue(state, bot, b) - botRoleValue(state, bot, a) || a.rank - b.rank)[0]?.key;
+}
+
+function botTargetRole(state: GameState, bot: PlayerState, roleKey: string) {
+  const nearFinish = state.players.some((player) => player.id !== bot.id && citySize(player) >= completionTarget(state) - 2);
+  const priorities: Record<string, Record<string, number>> = {
+    assassin: { king: 7, patrician: 7, architect: 6, scholar: 6, warlord: nearFinish ? 9 : 5, diplomat: nearFinish ? 8 : 4, marshal: nearFinish ? 8 : 4, merchant: 5 },
+    witch: { architect: 8, scholar: 8, merchant: 7, king: 6, warlord: 6 },
+    magistrate: { architect: 9, scholar: 8, trader: 8, merchant: 7, alchemist: 7 },
+    thief: { merchant: 9, trader: 8, king: 7, architect: 6, navigator: 2 },
+    blackmailer: { merchant: 9, trader: 8, king: 7, architect: 7, scholar: 6 },
+  };
+  return state.cast
+    .filter((candidate) => candidate.rank >= 2)
+    .filter((candidate) => roleKey !== "thief" || (candidate.key !== state.assassinatedRoleKey && candidate.key !== state.bewitchedRoleKey))
+    .filter((candidate) => roleKey !== "blackmailer" || (candidate.key !== state.assassinatedRoleKey && candidate.key !== state.bewitchedRoleKey))
+    .sort((a, b) => (priorities[roleKey]?.[b.key] ?? b.rank * 0.2) - (priorities[roleKey]?.[a.key] ?? a.rank * 0.2))[0];
+}
+
+function botWorstCards(state: GameState, bot: PlayerState, limit: number) {
+  return [...bot.hand]
+    .sort((a, b) => botCardValue(state, bot, a) - botCardValue(state, bot, b))
+    .slice(0, limit);
 }
 
 function botUseAbility(state: GameState, bot: PlayerState) {
   const role = activeRole(state);
   if (!role || bot.abilityUsed || state.pendingChoice) return;
   const target = botTargetPlayer(state, bot);
-  const roleTarget = state.cast.find((candidate) => candidate.rank > role.rank && candidate.key !== state.assassinatedRoleKey);
   try {
     if (["assassin", "witch", "magistrate", "thief", "blackmailer"].includes(role.key)) {
+      const roleTarget = botTargetRole(state, bot, role.key);
       if (roleTarget) activateRoleAbility(state, bot.id, { targetRoleKey: roleTarget.key });
     } else if (role.key === "spy" && target) {
-      activateRoleAbility(state, bot.id, { targetPlayerId: target.id, districtColor: "green" });
+      const color = (["yellow", "blue", "green", "red", "purple"] as DistrictColor[])
+        .sort((a, b) => target.city.filter((card) => card.color === b).length - target.city.filter((card) => card.color === a).length)[0];
+      activateRoleAbility(state, bot.id, { targetPlayerId: target.id, districtColor: color });
     } else if (role.key === "magician" && bot.hand.length) {
-      activateRoleAbility(state, bot.id, { mode: "redraw", cardUids: bot.hand.slice(0, 2).map((card) => card.uid) });
-    } else if (role.key === "wizard" && target?.hand.length) {
-      activateRoleAbility(state, bot.id, { targetPlayerId: target.id });
+      const richestHand = state.players
+        .filter((player) => player.id !== bot.id)
+        .sort((a, b) => b.hand.length - a.hand.length)[0];
+      if (richestHand && richestHand.hand.length >= bot.hand.length + 2) {
+        activateRoleAbility(state, bot.id, { mode: "swap", targetPlayerId: richestHand.id });
+      } else {
+        const cards = botWorstCards(state, bot, Math.min(3, bot.hand.length));
+        activateRoleAbility(state, bot.id, { mode: "redraw", cardUids: cards.map((card) => card.uid) });
+      }
+    } else if (role.key === "wizard") {
+      const handTarget = state.players
+        .filter((player) => player.id !== bot.id && player.hand.length)
+        .sort((a, b) => b.hand.length - a.hand.length)[0];
+      if (handTarget) activateRoleAbility(state, bot.id, { targetPlayerId: handTarget.id });
     } else if (role.key === "seer") {
       activateRoleAbility(state, bot.id);
-    } else if (role.key === "emperor" && target) {
-      activateRoleAbility(state, bot.id, { targetPlayerId: target.id, mode: target.gold ? "gold" : "card" });
+    } else if (role.key === "emperor") {
+      const recipient = state.players
+        .filter((player) => player.id !== bot.id)
+        .sort((a, b) => citySize(a) - citySize(b) || a.gold - b.gold)[0];
+      if (recipient) activateRoleAbility(state, bot.id, { targetPlayerId: recipient.id, mode: recipient.gold ? "gold" : "card" });
     } else if (role.key === "abbot") {
-      activateRoleAbility(state, bot.id, { amountCards: Math.floor(countIncomeDistricts(bot, "blue") / 2) });
+      const count = countIncomeDistricts(bot, "blue");
+      const cards = bot.gold >= 4 && bot.hand.length < 3 ? Math.ceil(count / 2) : 0;
+      activateRoleAbility(state, bot.id, { amountCards: cards });
     } else if (role.key === "architect") {
       activateRoleAbility(state, bot.id);
     } else if (role.key === "navigator") {
-      activateRoleAbility(state, bot.id, { mode: bot.gold < 4 ? "gold" : "cards" });
+      activateRoleAbility(state, bot.id, { mode: bot.hand.length <= 1 || bot.gold >= 7 ? "cards" : "gold" });
     } else if (role.key === "scholar") {
       activateRoleAbility(state, bot.id);
     } else if (role.key === "queen") {
       activateRoleAbility(state, bot.id);
     } else if (role.key === "artist" && bot.gold && bot.city.some((card) => !card.beautified)) {
-      activateRoleAbility(state, bot.id, { ownDistrictUid: bot.city.find((card) => !card.beautified)!.uid });
+      const district = [...bot.city]
+        .filter((card) => !card.beautified)
+        .sort((a, b) => botCardValue(state, bot, b) - botCardValue(state, bot, a))[0];
+      if (district) activateRoleAbility(state, bot.id, { ownDistrictUid: district.uid });
     } else if (role.key === "tax_collector") {
       activateRoleAbility(state, bot.id);
     }
   } catch {
-    // Optional abilities may have no legal target; bots simply pass them.
+    // Optional abilities may have no legal target; the bot safely passes them.
   }
 }
 
 function resolveBotPendingChoice(state: GameState, bot: PlayerState) {
   if (state.pendingChoice?.type === "blackmail" && state.pendingChoice.actorId === bot.id) {
-    resolveBlackmail(state, bot.id, bot.gold >= 4);
+    resolveBlackmail(state, bot.id, bot.gold >= 5);
   }
   if (state.pendingChoice?.type === "wizard" && state.pendingChoice.actorId === bot.id) {
     const target = requirePlayer(state, state.pendingChoice.targetPlayerId);
-    activateRoleAbility(state, bot.id, { cardUid: target.hand[0]?.uid, mode: "take" });
+    const card = [...target.hand].sort((a, b) => botCardValue(state, bot, b) - botCardValue(state, bot, a))[0];
+    if (card) {
+      const canBuild = card.key !== "secret_vault" && effectiveBuildCost(bot, card) <= bot.gold && botCardValue(state, bot, card) >= 7;
+      activateRoleAbility(state, bot.id, { cardUid: card.uid, mode: canBuild ? "build" : "take" });
+    }
   }
   while (state.pendingChoice?.type === "seer" && state.pendingChoice.actorId === bot.id) {
-    activateRoleAbility(state, bot.id, { cardUid: bot.hand[0]?.uid });
+    const card = botWorstCards(state, bot, 1)[0];
+    if (!card) break;
+    activateRoleAbility(state, bot.id, { cardUid: card.uid });
+  }
+}
+
+function botKeepPendingCard(state: GameState, bot: PlayerState) {
+  const card = [...bot.pendingDraw].sort((a, b) => botCardValue(state, bot, b) - botCardValue(state, bot, a))[0];
+  if (card) keepDistrictCard(state, bot.id, card.uid);
+}
+
+type BotBuildPlan = { card: DistrictCard; options: BuildOptions; value: number };
+
+function botBuildPlans(state: GameState, bot: PlayerState): BotBuildPlan[] {
+  const framework = bot.city.find((district) => district.key === "framework");
+  const sacrifice = [...bot.city]
+    .filter((district) => district.key !== "monument")
+    .sort((a, b) => adjustedCost(a) - adjustedCost(b))[0];
+  return bot.hand.flatMap((card) => {
+    if (card.key === "secret_vault") return [];
+    if (card.key === "monument" && bot.city.length >= 5) return [];
+    if (bot.city.some((built) => built.name === card.name) && !canBuildDuplicate(state, bot)) return [];
+    if (countedBuild(state, card) && bot.buildsThisTurn >= buildLimit(state)) return [];
+    const price = effectiveBuildCost(bot, card);
+    let options: BuildOptions = {};
+    let payment = price;
+    const cardinalCards = bot.hand.filter((candidate) => candidate.uid !== card.uid).length;
+    const cardinalFunds = activeRole(state)?.key === "cardinal"
+      && state.players.some((player) => player.id !== bot.id && player.gold >= Math.max(0, price - bot.gold))
+      && cardinalCards >= Math.max(0, price - bot.gold);
+    if (price > bot.gold && card.key === "thieves_den" && bot.gold + cardinalCards >= price) {
+      options = {
+        paymentCardUids: [...bot.hand]
+          .filter((candidate) => candidate.uid !== card.uid)
+          .sort((a, b) => botCardValue(state, bot, a) - botCardValue(state, bot, b))
+          .slice(0, price - bot.gold)
+          .map((candidate) => candidate.uid),
+      };
+      payment = bot.gold;
+    } else if (price > bot.gold && cardinalFunds) {
+      payment = price;
+    } else if (price > bot.gold && framework && botCardValue(state, bot, card) > botCardValue(state, bot, framework)) {
+      options = { mode: "framework", sacrificeUid: framework.uid };
+      payment = adjustedCost(framework);
+    } else if (price > bot.gold && card.key === "necropolis" && sacrifice) {
+      options = { mode: "necropolis", sacrificeUid: sacrifice.uid };
+      payment = adjustedCost(sacrifice);
+    } else if (price > bot.gold) {
+      return [];
+    }
+    const completion = citySize(bot) + (card.key === "monument" ? 2 : 1) >= completionTarget(state) ? 30 : 0;
+    return [{ card, options, value: botCardValue(state, bot, card) + completion - payment * 0.3 }];
+  }).sort((a, b) => b.value - a.value);
+}
+
+function botUseRankEightAbility(state: GameState, bot: PlayerState) {
+  const role = activeRole(state);
+  if (!role || bot.abilityUsed || !["warlord", "diplomat", "marshal"].includes(role.key)) return;
+  const opponents = state.players
+    .filter((player) => player.id !== bot.id && citySize(player) < completionTarget(state))
+    .sort((a, b) => citySize(b) - citySize(a));
+  try {
+    if (role.key === "warlord") {
+      const targets = opponents.flatMap((player) => player.city.map((district) => ({ player, district })))
+        .filter(({ player, district }) => !protectedFromRankEight(state, player, district))
+        .filter(({ player, district }) => rankEightPrice(player, district, district.cost - 1) <= bot.gold)
+        .sort((a, b) => botCardValue(state, b.player, b.district) - botCardValue(state, a.player, a.district));
+      const target = targets[0];
+      if (target) activateRankEightAbility(state, bot.id, target.player.id, target.district.uid);
+    } else if (role.key === "marshal") {
+      const targets = opponents.flatMap((player) => player.city.map((district) => ({ player, district })))
+        .filter(({ player, district }) => !protectedFromRankEight(state, player, district))
+        .filter(({ player, district }) => adjustedCost(district) <= 3 && rankEightPrice(player, district, district.cost) <= bot.gold)
+        .filter(({ district }) => !bot.city.some((owned) => owned.name === district.name))
+        .sort((a, b) => botCardValue(state, bot, b.district) - botCardValue(state, bot, a.district));
+      const target = targets[0];
+      if (target) activateRankEightAbility(state, bot.id, target.player.id, target.district.uid);
+    } else {
+      const ownDistricts = [...bot.city].sort((a, b) => botCardValue(state, bot, a) - botCardValue(state, bot, b));
+      const swaps = opponents.flatMap((player) => player.city.flatMap((district) => ownDistricts.map((own) => ({ player, district, own }))))
+        .filter(({ player, district }) => !protectedFromRankEight(state, player, district))
+        .filter(({ player, district, own }) => !player.city.some((card) => card.name === own.name) && !bot.city.some((card) => card.name === district.name))
+        .filter(({ player, district, own }) => rankEightPrice(player, district, Math.max(0, adjustedCost(district) - adjustedCost(own))) <= bot.gold)
+        .filter(({ district, own }) => botCardValue(state, bot, district) > botCardValue(state, bot, own) + 1)
+        .sort((a, b) => (botCardValue(state, bot, b.district) - botCardValue(state, bot, b.own)) - (botCardValue(state, bot, a.district) - botCardValue(state, bot, a.own)));
+      const target = swaps[0];
+      if (target) activateRankEightAbility(state, bot.id, target.player.id, target.district.uid, target.own.uid);
+    }
+  } catch {
+    // A protected or concurrently changed district simply makes the bot pass.
+  }
+}
+
+function botUseDistrictAbilities(state: GameState, bot: PlayerState, phase: "before" | "after") {
+  try {
+    if (phase === "before") {
+      const laboratory = bot.city.find((district) => district.key === "laboratory" && !bot.districtAbilitiesUsed.includes(district.uid));
+      const desired = botBuildPlans(state, bot)[0];
+      if (laboratory && desired && desired.card.cost > bot.gold && bot.hand.length > 1) {
+        const card = botWorstCards(state, bot, 1)[0];
+        if (card && card.uid !== desired.card.uid) activateDistrictAbility(state, bot.id, laboratory.uid, { cardUid: card.uid });
+      }
+      return;
+    }
+    const smithy = bot.city.find((district) => district.key === "smithy" && !bot.districtAbilitiesUsed.includes(district.uid));
+    if (smithy && bot.gold >= 2 && bot.hand.length <= 1) activateDistrictAbility(state, bot.id, smithy.uid);
+    const museum = bot.city.find((district) => district.key === "museum" && !bot.districtAbilitiesUsed.includes(district.uid));
+    if (museum && bot.hand.length >= 3) {
+      const card = botWorstCards(state, bot, 1)[0];
+      if (card && card.key !== "secret_vault") activateDistrictAbility(state, bot.id, museum.uid, { cardUid: card.uid });
+    }
+    const armory = bot.city.find((district) => district.key === "armory" && !bot.districtAbilitiesUsed.includes(district.uid));
+    const threat = botTargetPlayer(state, bot);
+    if (armory && threat && citySize(threat) === completionTarget(state) - 1) {
+      const district = [...threat.city]
+        .filter((card) => !protectedFromRankEight(state, threat, card))
+        .sort((a, b) => adjustedCost(b) - adjustedCost(a))[0];
+      if (district && adjustedCost(district) > adjustedCost(armory)) {
+        activateDistrictAbility(state, bot.id, armory.uid, { targetPlayerId: threat.id, targetDistrictUid: district.uid });
+      }
+    }
+  } catch {
+    // District powers are optional, so an unavailable target is safe to skip.
   }
 }
 
 function botTurn(state: GameState, bot: PlayerState) {
   if (!bot.resourceTaken) {
-    const affordable = bot.hand.some((card) => effectiveBuildCost(bot, card) <= bot.gold);
-    if (affordable || bot.gold < 3) takeGold(state, bot.id);
-    else drawDistrictChoices(state, bot.id);
+    const plans = botBuildPlans(state, bot);
+    const hasGoodBuild = plans.some((plan) => plan.options.mode || effectiveBuildCost(bot, plan.card) <= bot.gold);
+    if (!bot.hand.length || (!hasGoodBuild && bot.gold >= 3)) drawDistrictChoices(state, bot.id);
+    else takeGold(state, bot.id);
   }
-  if (bot.pendingDraw.length) keepDistrictCard(state, bot.id, bot.pendingDraw[0].uid);
+  if (bot.pendingDraw.length) botKeepPendingCard(state, bot);
   if (state.activePlayerId !== bot.id) return;
   resolveBotPendingChoice(state, bot);
-  if (bot.pendingDraw.length) keepDistrictCard(state, bot.id, bot.pendingDraw[0].uid);
+  if (bot.pendingDraw.length) botKeepPendingCard(state, bot);
   if (state.activePlayerId !== bot.id) return;
 
   const role = activeRole(state);
@@ -1483,22 +1736,23 @@ function botTurn(state: GameState, bot: PlayerState) {
   botUseAbility(state, bot);
   resolveBotPendingChoice(state, bot);
   if (state.activePlayerId !== bot.id) return;
-  if (bot.pendingDraw.length) keepDistrictCard(state, bot.id, bot.pendingDraw[0].uid);
+  if (bot.pendingDraw.length) botKeepPendingCard(state, bot);
 
+  botUseDistrictAbilities(state, bot, "before");
   while (state.activePlayerId === bot.id && activeRole(state)?.key !== "navigator") {
-    const card = [...bot.hand]
-      .filter((candidate) => candidate.key !== "secret_vault")
-      .filter((candidate) => !bot.city.some((built) => built.name === candidate.name) || canBuildDuplicate(state, bot))
-      .filter((candidate) => effectiveBuildCost(bot, candidate) <= bot.gold)
-      .sort((a, b) => b.cost - a.cost)[0];
-    if (!card) break;
+    const plan = botBuildPlans(state, bot)[0];
+    if (!plan) break;
     try {
-      buildDistrict(state, bot.id, card.uid);
+      buildDistrict(state, bot.id, plan.card.uid, plan.options);
     } catch {
       break;
     }
-    if (countedBuild(state, card) && bot.buildsThisTurn >= buildLimit(state)) break;
   }
+  botUseRankEightAbility(state, bot);
+  if (role?.key === "artist") {
+    botUseAbility(state, bot);
+  }
+  botUseDistrictAbilities(state, bot, "after");
   if (state.activePlayerId === bot.id) endTurn(state, bot.id);
 }
 
@@ -1510,13 +1764,24 @@ export function processBots(state: GameState) {
       const picker = state.players.find((player) => player.id === currentPickerId(state));
       if (!picker?.isBot) break;
       const options = availableForPicker(state);
-      chooseRole(state, picker.id, options[Math.floor(Math.random() * options.length)]);
+      const roleKey = botChooseRole(state, picker, options);
+      if (!roleKey) break;
+      chooseRole(state, picker.id, roleKey);
       continue;
     }
     if (state.status === "theater") {
       const owner = state.players.find((player) => player.id === state.theaterPlayerId);
       if (!owner?.isBot) break;
-      resolveTheater(state, owner.id);
+      const weakestRole = [...owner.roleKeys]
+        .map((key) => getRole(key))
+        .filter((role): role is RoleDefinition => Boolean(role))
+        .sort((a, b) => botRoleValue(state, owner, a) - botRoleValue(state, owner, b))[0];
+      const target = botTargetPlayer(state, owner);
+      if (weakestRole && target && botRoleValue(state, owner, weakestRole) < 5) {
+        resolveTheater(state, owner.id, target.id, weakestRole.key);
+      } else {
+        resolveTheater(state, owner.id);
+      }
       continue;
     }
     if (state.status === "turns") {
