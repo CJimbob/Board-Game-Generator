@@ -318,6 +318,7 @@ button:disabled { cursor: not-allowed; opacity: 0.46; }
 .inline-manage { position: absolute; right: .6rem; bottom: .45rem; border: 1px solid rgba(239,176,168,.35); background: transparent; color: #efb0a8; font-size: .58rem; padding: .22rem .38rem; }
 .player-name { font-size: 0.82rem; font-weight: 800; }
 .player-name span { color: var(--gold-light); margin-right: 0.3rem; }
+.player-name .picker-badge { display: inline-block; margin: 0 0 0 .45rem; border: 1px solid rgba(232,202,131,.4); border-radius: 999px; padding: .12rem .38rem; color: #fff3c5; background: rgba(197,154,75,.18); font-size: .52rem; vertical-align: .08rem; }
 .player-facts { display: flex; gap: 0.65rem; color: rgba(255, 255, 255, 0.6); font-size: 0.69rem; margin-top: 0.32rem; }
 .player-facts span:first-child { color: var(--gold-light); }
 .role-token { grid-column: 1 / -1; color: rgba(255, 255, 255, 0.42); font-size: 0.64rem; padding-left: 3.25rem; margin-top: -0.45rem; }
@@ -349,6 +350,7 @@ button:disabled { cursor: not-allowed; opacity: 0.46; }
 .round-role-effects .effect-robbed { color: #fff; background: #715536; }
 .round-role-effects .effect-bewitched { color: #fff; background: #765990; }
 .round-role-effects .effect-warrant { color: #fff8e5; background: #8d672c; }
+.round-role-effects .effect-threat { color: #fff; background: #874953; }
 
 .center-stage { min-height: calc(100vh - 10rem); padding: clamp(3rem, 7vw, 7rem) clamp(1rem, 5vw, 6rem); text-align: center; background: radial-gradient(circle at 50% 20%, #fffdf7, var(--paper) 63%); }
 .center-stage h2 { margin: 0.6rem 0; font-family: "Songti SC", "STSong", Georgia, serif; font-size: clamp(2.2rem, 5vw, 4rem); }

@@ -389,3 +389,38 @@ test("Magistrate chooses all three warrants and decides whether to confiscate th
   assert.equal(state.pendingChoice, null);
   assert.equal(state.warrantResolved, true);
 });
+
+test("Thief and Blackmailer cannot target themselves, and Blackmailer chooses both threats", () => {
+  const prepareRole = (roleKey: string) => {
+    const { state, host } = createGameState("SELF", "能力玩家");
+    const role = ROLES.find((candidate) => candidate.key === roleKey)!;
+    state.status = "turns";
+    state.cast = ROLES;
+    state.currentRank = role.rank;
+    state.currentRoleKey = role.key;
+    state.activePlayerId = host.id;
+    host.roleKeys = [role.key];
+    return { state, host };
+  };
+
+  const thiefGame = prepareRole("thief");
+  assert.throws(
+    () => activateRoleAbility(thiefGame.state, thiefGame.host.id, { targetRoleKey: "thief" }),
+    /盗贼不能偷窃自己/,
+  );
+
+  const blackmailerGame = prepareRole("blackmailer");
+  assert.throws(
+    () => activateRoleAbility(blackmailerGame.state, blackmailerGame.host.id, {
+      targetRoleKey: "merchant",
+      targetRoleKeys: ["blackmailer", "merchant"],
+    }),
+    /勒索者不能威胁自己/,
+  );
+  activateRoleAbility(blackmailerGame.state, blackmailerGame.host.id, {
+    targetRoleKey: "merchant",
+    targetRoleKeys: ["merchant", "architect"],
+  });
+  assert.deepEqual(blackmailerGame.state.threats, { merchant: true, architect: false });
+  assert.deepEqual(publicGameView(blackmailerGame.state, blackmailerGame.host.id).threatenedRoleKeys.sort(), ["architect", "merchant"]);
+});

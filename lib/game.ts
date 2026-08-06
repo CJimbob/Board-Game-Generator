@@ -878,11 +878,6 @@ function validateTargetRole(state: GameState, key: string | undefined, minimumRa
   return role;
 }
 
-function randomOtherRole(state: GameState, excludedKeys: string[]) {
-  const candidates = state.cast.filter((role) => !excludedKeys.includes(role.key));
-  return candidates[Math.floor(Math.random() * candidates.length)]?.key;
-}
-
 function exchangeWholeHands(first: PlayerState, second: PlayerState) {
   [first.hand, second.hand] = [second.hand, first.hand];
 }
@@ -976,6 +971,7 @@ export function activateRoleAbility(state: GameState, playerId: string, payload:
     }
     case "thief": {
       const target = validateTargetRole(state, normalized.targetRoleKey, 2);
+      if (target.key === role.key) throw new Error("盗贼不能偷窃自己。 ");
       if (target.key === state.assassinatedRoleKey || target.key === state.bewitchedRoleKey) {
         throw new Error("不能偷窃被刺杀或被魅惑的角色。 ");
       }
@@ -1000,12 +996,15 @@ export function activateRoleAbility(state: GameState, playerId: string, payload:
       break;
     }
     case "blackmailer": {
-      const target = validateTargetRole(state, normalized.targetRoleKey, 2);
+      const targetKeys = [...new Set(normalized.targetRoleKeys ?? [])];
+      if (targetKeys.length !== 2) throw new Error("勒索者必须选择两个不同的目标角色。 ");
+      const targets = targetKeys.map((key) => validateTargetRole(state, key, 2));
+      if (targets.some((target) => target.key === role.key)) throw new Error("勒索者不能威胁自己。 ");
       const forbidden = [state.assassinatedRoleKey, state.bewitchedRoleKey].filter(Boolean);
-      if (forbidden.includes(target.key)) throw new Error("不能威胁被刺杀或被魅惑的角色。 ");
-      const decoy = randomOtherRole(state, [role.key, target.key, ...forbidden] as string[]);
-      state.threats = { [target.key]: true };
-      if (decoy) state.threats[decoy] = false;
+      if (targets.some((target) => forbidden.includes(target.key))) throw new Error("不能威胁被刺杀或被魅惑的角色。 ");
+      const signedTarget = targets.find((target) => target.key === normalized.targetRoleKey);
+      if (!signedTarget) throw new Error("请在两个目标中指定真威胁。 ");
+      state.threats = Object.fromEntries(targets.map((target) => [target.key, target.key === signedTarget.key]));
       state.blackmailerPlayerId = player.id;
       player.abilityUsed = true;
       addLog(state, "勒索者秘密放下了两枚威胁标记。 ");
@@ -1581,6 +1580,7 @@ function botTargetRole(state: GameState, bot: PlayerState, roleKey: string) {
   };
   return state.cast
     .filter((candidate) => candidate.rank >= 2)
+    .filter((candidate) => !["thief", "blackmailer"].includes(roleKey) || candidate.key !== roleKey)
     .filter((candidate) => roleKey !== "thief" || (candidate.key !== state.assassinatedRoleKey && candidate.key !== state.bewitchedRoleKey))
     .filter((candidate) => roleKey !== "blackmailer" || (candidate.key !== state.assassinatedRoleKey && candidate.key !== state.bewitchedRoleKey))
     .sort((a, b) => (priorities[roleKey]?.[b.key] ?? b.rank * 0.2) - (priorities[roleKey]?.[a.key] ?? a.rank * 0.2))[0];
@@ -1609,7 +1609,19 @@ function botUseAbility(state: GameState, bot: PlayerState) {
           targetRoleKeys: [signedTarget.key, ...decoys.map((candidate) => candidate.key)],
         });
       }
-    } else if (["assassin", "witch", "thief", "blackmailer"].includes(role.key)) {
+    } else if (role.key === "blackmailer") {
+      const signedTarget = botTargetRole(state, bot, role.key);
+      const decoy = state.cast
+        .filter((candidate) => candidate.rank >= 2 && candidate.key !== role.key && candidate.key !== signedTarget?.key)
+        .filter((candidate) => candidate.key !== state.assassinatedRoleKey && candidate.key !== state.bewitchedRoleKey)
+        .sort((a, b) => b.rank - a.rank)[0];
+      if (signedTarget && decoy) {
+        activateRoleAbility(state, bot.id, {
+          targetRoleKey: signedTarget.key,
+          targetRoleKeys: [signedTarget.key, decoy.key],
+        });
+      }
+    } else if (["assassin", "witch", "thief"].includes(role.key)) {
       const roleTarget = botTargetRole(state, bot, role.key);
       if (roleTarget) activateRoleAbility(state, bot.id, { targetRoleKey: roleTarget.key });
     } else if (role.key === "spy" && target) {
@@ -2037,6 +2049,7 @@ export function publicGameView(
     allUniqueDistricts: UNIQUE_DISTRICTS,
     taxPool: state.taxPool,
     warrantRoleKeys: Object.keys(state.warrants),
+    threatenedRoleKeys: Object.keys(state.threats),
     pendingChoice: publicPendingChoice(state, viewerId),
     assassinatedRoleKey: state.assassinatedRoleKey,
     robbedRoleKey: state.robbedRoleKey,
