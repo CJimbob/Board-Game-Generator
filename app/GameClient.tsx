@@ -294,11 +294,31 @@ function Lobby({ game, act }: { game: Game; act: Act }) {
   </section>;
 }
 
+function Chronicle({ game }: { game: Game }) {
+  const { language, text } = useLanguage();
+  return <aside className="chronicle"><div className="chronicle-heading"><span>◆</span><h3>{text("王城纪事", "City chronicle")}</h3></div><ol>{[...game.log].reverse().map((entry, index) => <li key={`${entry}-${index}`}>{translatedGameMessage(entry, language)}</li>)}</ol></aside>;
+}
+
+function DraftTableOverview({ game, onReturn }: { game: Game; onReturn: () => void }) {
+  const { language, text } = useLanguage();
+  const me = game.players.find((player) => player.id === game.viewerId)!;
+  const myTurn = game.currentPickerId === game.viewerId;
+  return <div className="turn-layout draft-table-overview"><section className="table-area"><div className="turn-banner draft-overview-banner"><div><span>{text(`第 ${game.round} 轮 · 秘密选角中`, `Round ${game.round} · Secret draft in progress`)}</span><h2>{myTurn ? text("现在轮到你选角色", "It is your turn to choose") : text("选角期间的牌桌", "The table during the draft")}</h2></div><button className={myTurn ? "primary-button" : "secondary-button"} onClick={onReturn}>{myTurn ? text("继续选角色 →", "Choose a character →") : text("返回选角", "Back to draft")}</button></div>
+    <div className="draft-resource-grid" aria-label={text("你的资源", "Your resources")}><article><span>●</span><div><small>{text("金币", "Gold")}</small><strong>{me.gold}</strong></div></article><article><span>▰</span><div><small>{text("手牌", "Cards")}</small><strong>{me.handCount}</strong></div></article><article><span>⌂</span><div><small>{text("城区", "Districts")}</small><strong>{citySize(me)} / {game.completionTarget}</strong></div></article><article><span>♜</span><div><small>{text("已选身份", "Chosen characters")}</small><strong>{me.roleKeys.length}</strong></div></article></div>
+    {me.roleKeys.length > 0 && <div className="draft-private-roles"><span>{text("仅你可见的已选身份", "Your secret chosen characters")}</span><div>{me.roleKeys.map((key) => { const role = roleFor(game, key, language); return role ? <strong key={key} className={`color-${role.color}`}>{role.rank} · {role.name}</strong> : null; })}</div></div>}
+    <section className="hand-section readonly-hand"><div className="section-title"><h3>{text("你的城区牌", "Your district cards")}</h3><span>{text("选角时只能查看，行动阶段才能建造", "View only during the draft; build during your turn")}</span></div>{me.hand.length ? <div className="card-row">{me.hand.map((district) => <DistrictCard key={district.uid} district={district} />)}</div> : <div className="empty-hand">{text("你暂时没有城区牌。", "You have no district cards.")}</div>}</section>
+    <section className="cities-section"><div className="section-title"><h3>{text("桌上的城市", "Cities on the table")}</h3><span>{text(`达到 ${game.completionTarget} 座触发终局`, `Reach ${game.completionTarget} districts to trigger the end`)}</span></div><div className="city-grid">{game.players.map((player) => <article className="city-panel" key={player.id}><header><strong>{player.name}</strong><span>{text(`${player.score} 当前分`, `${player.score} current points`)}</span></header><div className="mini-districts">{player.city.map((district) => <DistrictCard key={district.uid} district={district} compact />)}{!player.city.length && <span className="empty-city">{text("尚未建造", "No districts yet")}</span>}</div></article>)}</div></section>
+  </section><Chronicle game={game} /></div>;
+}
+
 function Draft({ game, act }: { game: Game; act: Act }) {
   const { language, text } = useLanguage();
+  const [showTable, setShowTable] = useState(false);
   const myTurn = game.currentPickerId === game.viewerId;
   const me = game.players.find((player) => player.id === game.viewerId)!;
+  if (showTable) return <DraftTableOverview game={game} onReturn={() => setShowTable(false)} />;
   return <section className="center-stage draft-stage"><div className="eyebrow">{text(`第 ${game.round} 轮 · 秘密选角`, `Round ${game.round} · Secret draft`)}</div><h2>{myTurn ? text(`选择你的第 ${me.roleKeys.length + 1} 个身份`, `Choose character ${me.roleKeys.length + 1}`) : text("其他玩家正在选择身份", "Another player is choosing")}</h2><p>{myTurn ? text("只有你看得到当前可选角色。2–3 人每轮会各选两个角色。", "Only you can see these choices. With 2–3 players, everyone chooses two characters.") : text("角色会沿皇冠方向依次传递，请留在牌桌。", "The draft passes around the table from the crown holder.")}</p>
+    <button className="draft-table-toggle" onClick={() => setShowTable(true)}>← {text("返回牌桌，查看资源与历史", "Return to the table · resources and history")}</button>
     {game.faceupDiscardedRoleKeys.length > 0 && <div className="faceup-discards">{text("本轮明置弃牌：", "Face-up discards: ")}{game.faceupDiscardedRoleKeys.map((key) => roleFor(game, key, language)?.name).join(language === "en" ? ", " : "、")}</div>}
     {myTurn ? <div className="role-grid">{game.roles.filter((role) => game.availableRoleKeys.includes(role.key)).map((source) => { const role = localizedRole(source, language); return <button key={role.key} className={`role-card color-${role.color}`} onClick={() => act("chooseRole", { roleKey: role.key })}><span className="role-number">{role.rank}</span><span className="role-name">{role.name}</span><span className="role-short">{role.short}</span><span className="role-description">{role.description}</span><span className="choose-label">{text("秘密选择 →", "Choose secretly →")}</span></button>; })}</div> : <div className="waiting-orbit" aria-label={text("等待其他玩家", "Waiting for another player")}><span>♛</span></div>}
   </section>;
@@ -394,7 +414,7 @@ function Turns({ game, act }: { game: Game; act: Act }) {
       <button className="end-turn" onClick={() => act("endTurn")} disabled={!me.resourceTaken || me.pendingDraw.length > 0 || Boolean(game.pendingChoice)}>{text("结束回合 →", "End turn →")}</button>
     </div>}
     <section className="cities-section"><div className="section-title"><h3>{text("桌上的城市", "Cities on the table")}</h3><span>{text(`达到 ${game.completionTarget} 座触发终局；纪念碑按两座`, `Reach ${game.completionTarget} districts to trigger the end; Monument counts as two`)}</span></div><div className="city-grid">{game.players.map((player) => <article className="city-panel" key={player.id}><header><strong>{player.name}</strong><span>{text(`${player.score} 当前分`, `${player.score} current points`)}</span></header><div className="mini-districts">{player.city.map((district) => <DistrictCard key={district.uid} district={district} compact />)}{!player.city.length && <span className="empty-city">{text("尚未建造", "No districts yet")}</span>}</div></article>)}</div></section>
-  </section><aside className="chronicle"><div className="chronicle-heading"><span>◆</span><h3>{text("王城纪事", "City chronicle")}</h3></div><ol>{[...game.log].reverse().map((entry, index) => <li key={`${entry}-${index}`}>{translatedGameMessage(entry, language)}</li>)}</ol></aside>
+  </section><Chronicle game={game} />
     {me.pendingDraw.length > 0 && <div className="modal-backdrop"><div className="draw-modal" role="dialog" aria-modal="true" aria-labelledby="draw-title"><div className="eyebrow">{me.pendingDrawMode === "scholar" ? text("学者翻阅七份蓝图", "Scholar examines seven plans") : text("来自牌库的道路", "Drawn from the deck")}</div><h2 id="draw-title">{text("保留一张城区牌", "Keep a district card")}</h2><div className="draw-choices many-choices">{me.pendingDraw.map((district) => <DistrictCard key={district.uid} district={district} action={{ label: text("保留这张", "Keep this card"), onClick: () => act("keepCard", { cardUid: district.uid }) }} />)}</div></div></div>}
   </div>;
 }

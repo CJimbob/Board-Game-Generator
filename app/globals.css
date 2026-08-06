@@ -315,6 +315,8 @@ button:disabled { cursor: not-allowed; opacity: 0.46; }
 .waiting-orbit { width: 8rem; height: 8rem; display: grid; place-items: center; border: 1px dashed #ae9261; border-radius: 50%; margin: 4rem auto; animation: spin 8s linear infinite; }
 .waiting-orbit span { color: var(--gold); font-size: 2.5rem; animation: counterspin 8s linear infinite; }
 .faceup-discards { width: fit-content; margin: 0 auto 1rem; border: 1px solid rgba(155,117,55,.25); color: #80683f; background: rgba(255,255,255,.34); padding: .55rem .8rem; font-size: .72rem; }
+.draft-table-toggle { display: block; width: fit-content; margin: -1.35rem auto 1rem; border: 0; border-bottom: 1px solid rgba(128,104,63,.35); background: transparent; color: #80683f; padding: .35rem .2rem; font-size: .73rem; font-weight: 800; }
+.draft-table-toggle:hover { color: #a06f25; border-color: #a06f25; }
 .theater-own-roles, .target-player-grid { display: flex; flex-wrap: wrap; justify-content: center; gap: .6rem; margin: 1rem auto; }
 .theater-own-roles button, .target-player-grid button { border: 1px solid var(--line); background: #fffdf8; padding: .8rem 1rem; color: var(--ink); font-weight: 750; }
 .theater-own-roles button.selected { border-color: var(--gold); background: #fff4d7; color: #8a6429; }
@@ -331,6 +333,17 @@ button:disabled { cursor: not-allowed; opacity: 0.46; }
 .turn-banner { display: flex; justify-content: space-between; align-items: center; gap: 1rem; padding-bottom: 1.4rem; border-bottom: 1px solid var(--line); }
 .turn-banner > div:first-child > span { color: #8d6c36; font-size: .72rem; letter-spacing: .12em; }
 .turn-banner h2 { margin: .25rem 0 0; font-family: "Songti SC", "STSong", Georgia, serif; font-size: clamp(1.8rem, 4vw, 3rem); }
+.draft-overview-banner > button { min-width: 10.5rem; min-height: 2.8rem; }
+.draft-resource-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: .7rem; padding: 1.4rem 0; }
+.draft-resource-grid article { display: flex; align-items: center; gap: .8rem; min-height: 5.6rem; border: 1px solid var(--line); background: rgba(255,255,255,.42); padding: .9rem 1rem; }
+.draft-resource-grid article > span { width: 2.4rem; height: 2.4rem; display: grid; place-items: center; border-radius: 50%; color: #fff8e9; background: #9a7437; font: 900 1.05rem Georgia, serif; }
+.draft-resource-grid small { display: block; color: #847966; font-size: .65rem; }
+.draft-resource-grid strong { display: block; margin-top: .15rem; color: var(--ink); font: 900 1.35rem Georgia, serif; }
+.draft-private-roles { display: flex; align-items: center; justify-content: space-between; gap: 1rem; border-left: 3px solid #7c647f; background: #e9e2eb; padding: .8rem 1rem; }
+.draft-private-roles > span { color: #6b5b6d; font-size: .7rem; font-weight: 800; }
+.draft-private-roles > div { display: flex; gap: .45rem; flex-wrap: wrap; }
+.draft-private-roles strong { border: 1px solid color-mix(in srgb, var(--role-color) 32%, transparent); color: var(--role-color); background: rgba(255,255,255,.52); padding: .45rem .65rem; font-size: .72rem; }
+.readonly-hand .district-card { cursor: default; }
 .my-role { min-width: 18rem; display: flex; align-items: center; gap: .8rem; border-left: 3px solid var(--role-color); padding: .5rem 1rem; background: rgba(255,255,255,.42); }
 .my-role > b { color: var(--role-color); font: 900 2.2rem/1 Georgia, serif; }
 .my-role span { font-family: "Songti SC", "STSong", Georgia, serif; font-size: 1.1rem; font-weight: 900; }
@@ -471,6 +484,7 @@ button:disabled { cursor: not-allowed; opacity: 0.46; }
   .entry-panel { min-height: 35rem; padding: 3rem 2rem; }
   .role-grid { grid-template-columns: repeat(2, 1fr); }
   .turn-layout { grid-template-columns: 1fr; }
+  .draft-resource-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .chronicle { border-left: 0; border-top: 1px solid rgba(43,37,28,.14); }
   .chronicle ol { display: grid; grid-template-columns: repeat(2, 1fr); column-gap: 1rem; }
   .rule-card-grid { grid-template-columns: repeat(2, minmax(0,1fr)); }
@@ -498,6 +512,8 @@ button:disabled { cursor: not-allowed; opacity: 0.46; }
   .role-card { min-height: 14rem; }
   .table-area { padding: 1rem; }
   .turn-banner { align-items: flex-start; flex-direction: column; }
+  .draft-overview-banner > button { width: 100%; }
+  .draft-private-roles { align-items: flex-start; flex-direction: column; }
   .my-role { width: 100%; min-width: 0; }
   .resource-actions { align-items: stretch; flex-direction: column; }
   .resource-actions > div { margin-right: 0; }
