@@ -100,6 +100,7 @@ export function localizedRuleset<T extends RulesetDefinition>(ruleset: T, langua
 }
 
 const ERROR_EN: Record<string, string> = {
+  "这台设备的历史记录密钥无效，请刷新页面重试。": "This device's history key is invalid. Refresh the page and try again.",
   "请输入四位房间码。": "Enter the four-character room code.",
   "没有找到这个房间，房间可能已超过 7 天未活动。": "Room not found. It may have expired after seven inactive days.",
   "房间身份已经失效，请使用恢复码返回座位。": "Your seat session is no longer valid. Use the recovery code to return.",

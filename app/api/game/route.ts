@@ -7,6 +7,7 @@ import {
   buildDistrict,
   chooseRole,
   claimHost,
+  createMatchHistorySummary,
   createGameState,
   destroyDistrict,
   drawDistrictChoices,
@@ -30,11 +31,13 @@ import {
   type PlayerState,
 } from "@/lib/game";
 import {
+  archiveFinishedMatch,
   cleanupExpiredRooms,
   deletePlayerMetadata,
   enforceRateLimit,
   insertRoom,
   isPlayerOffline,
+  listMatchHistory,
   loadPresence,
   loadRoomRecord,
   saveRoom,
@@ -53,6 +56,7 @@ type ActionBody = {
   playerId?: string;
   token?: string;
   recoveryCode?: string;
+  historyKey?: string;
   roleId?: number;
   roleKey?: string;
   targetRole?: number;
@@ -79,6 +83,10 @@ function cleanRecoveryCode(value: string | null | undefined) {
   return (value ?? "").trim().toUpperCase().replace(/[^A-Z0-9]/g, "").slice(0, 10);
 }
 
+function cleanHistoryKey(value: string | null | undefined) {
+  return (value ?? "").trim().replace(/[^A-Za-z0-9_-]/g, "").slice(0, 128);
+}
+
 function randomCode(length: number) {
   const alphabet = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
   let code = "";
@@ -92,6 +100,18 @@ async function hashRecoveryCode(code: string) {
   const bytes = new TextEncoder().encode(code);
   const digest = await crypto.subtle.digest("SHA-256", bytes);
   return Array.from(new Uint8Array(digest), (byte) => byte.toString(16).padStart(2, "0")).join("");
+}
+
+async function historyKeyHash(value: string | null | undefined) {
+  const key = cleanHistoryKey(value);
+  if (key.length < 32) return null;
+  return hashRecoveryCode(key);
+}
+
+async function archiveIfFinished(state: GameState) {
+  if (state.status === "finished") {
+    await archiveFinishedMatch(state, createMatchHistorySummary(state));
+  }
 }
 
 function clientKey(request: NextRequest) {
@@ -162,6 +182,7 @@ export async function GET(request: NextRequest) {
       token: request.nextUrl.searchParams.get("token") ?? undefined,
     });
     authenticate(state, session.playerId, session.token);
+    await archiveIfFinished(state);
     return await responseFor(state, session.playerId);
   } catch (error) {
     return failure(error);
@@ -172,6 +193,13 @@ export async function POST(request: NextRequest) {
   try {
     const body = (await request.json()) as ActionBody;
     const ip = clientKey(request);
+
+    if (body.action === "listHistory") {
+      await enforceRateLimit(`history:${ip}`, 30);
+      const keyHash = await historyKeyHash(body.historyKey);
+      if (!keyHash) throw new Error("这台设备的历史记录密钥无效，请刷新页面重试。 ");
+      return NextResponse.json({ history: await listMatchHistory(keyHash) });
+    }
 
     if (body.action === "create") {
       await enforceRateLimit(`entry:${ip}`, 20);
@@ -189,6 +217,7 @@ export async function POST(request: NextRequest) {
           Boolean(body.includeRankNine),
         );
         host.recoveryHash = await hashRecoveryCode(recoveryCode);
+        host.historyKeyHash = await historyKeyHash(body.historyKey) ?? undefined;
         if (await insertRoom(state)) {
           return await responseFor(state, host.id, { token: host.token, recoveryCode });
         }
@@ -207,6 +236,7 @@ export async function POST(request: NextRequest) {
         const { state, revision } = requireCurrentRoom(await loadRoomRecord(code));
         const player = joinGame(state, body.name ?? "");
         player.recoveryHash = recoveryHash;
+        player.historyKeyHash = await historyKeyHash(body.historyKey) ?? undefined;
         if (await saveRoom(state, revision)) {
           return await responseFor(state, player.id, { token: player.token, recoveryCode });
         }
@@ -222,8 +252,10 @@ export async function POST(request: NextRequest) {
       const { state, revision } = requireCurrentRoom(await loadRoomRecord(code));
       const seat = state.players.find((player) => player.recoveryHash === recoveryHash);
       if (!seat) throw new Error("恢复码不正确，或这个座位已经被移除。 ");
+      seat.historyKeyHash = await historyKeyHash(body.historyKey) ?? seat.historyKeyHash;
       const player = restorePlayerSeat(state, seat.id);
       await saveOrConflict(state, revision);
+      await archiveIfFinished(state);
       return await responseFor(state, player.id, { token: player.token, recoveryCode });
     }
 
@@ -233,6 +265,12 @@ export async function POST(request: NextRequest) {
     const player = authenticate(state, session.playerId, session.token);
     await enforceRateLimit(`action:${ip}:${player.id}`, 120);
     await touchPresence(state.code, player.id);
+    const keyHash = await historyKeyHash(body.historyKey);
+    if (keyHash && player.historyKeyHash !== keyHash) {
+      player.historyKeyHash = keyHash;
+      state.version += 1;
+      state.updatedAt = new Date().toISOString();
+    }
 
     if (body.action === "refreshRecovery") {
       const recoveryCode = randomCode(10);
@@ -240,6 +278,7 @@ export async function POST(request: NextRequest) {
       state.version += 1;
       state.updatedAt = new Date().toISOString();
       await saveOrConflict(state, revision);
+      await archiveIfFinished(state);
       return await responseFor(state, player.id, { token: player.token, recoveryCode });
     }
 
@@ -277,6 +316,7 @@ export async function POST(request: NextRequest) {
         const result = leaveGame(state, player.id);
         processBots(state);
         await saveOrConflict(state, revision);
+        await archiveIfFinished(state);
         await deletePlayerMetadata(state.code, player.id);
         return NextResponse.json({ left: true, seatPreserved: !result.removed });
       }
@@ -356,6 +396,7 @@ export async function POST(request: NextRequest) {
 
     processBots(state);
     await saveOrConflict(state, revision);
+    await archiveIfFinished(state);
     if (removedPlayer) await deletePlayerMetadata(state.code, removedPlayer.id);
     return await responseFor(state, player.id);
   } catch (error) {

@@ -1,5 +1,5 @@
 import { sql } from "drizzle-orm";
-import { integer, primaryKey, sqliteTable, text } from "drizzle-orm/sqlite-core";
+import { index, integer, primaryKey, sqliteTable, text } from "drizzle-orm/sqlite-core";
 
 export const gameRooms = sqliteTable("game_rooms", {
   code: text("code").primaryKey(),
@@ -20,3 +20,19 @@ export const gameRateLimits = sqliteTable("game_rate_limits", {
   window: integer("window").notNull(),
   count: integer("count").notNull().default(1),
 }, (table) => [primaryKey({ columns: [table.key, table.window] })]);
+
+export const gameMatchHistory = sqliteTable("game_match_history", {
+  id: text("id").primaryKey(),
+  roomCode: text("room_code").notNull(),
+  completedAt: text("completed_at").notNull(),
+  summary: text("summary").notNull(),
+});
+
+export const gameMatchHistoryPlayers = sqliteTable("game_match_history_players", {
+  historyId: text("history_id").notNull(),
+  historyKeyHash: text("history_key_hash").notNull(),
+  playerId: text("player_id").notNull(),
+}, (table) => [
+  primaryKey({ columns: [table.historyId, table.historyKeyHash, table.playerId] }),
+  index("game_match_history_players_key_idx").on(table.historyKeyHash),
+]);

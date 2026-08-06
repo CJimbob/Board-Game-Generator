@@ -202,6 +202,8 @@ button:disabled { cursor: not-allowed; opacity: 0.46; }
 .divider { display: flex; align-items: center; gap: 1rem; color: #8f846f; font-size: 0.7rem; margin: 1.8rem 0; }
 .divider::before, .divider::after { content: ""; height: 1px; background: rgba(68, 55, 36, 0.14); flex: 1; }
 .form-error { margin: 1rem 0 0; color: #a83f35; font-size: 0.82rem; }
+.history-entry-button { width: 100%; margin-top: 1rem; border: 1px solid rgba(142,108,53,.28); background: rgba(255,255,255,.38); color: #765b30; padding: .75rem 1rem; font-size: .74rem; font-weight: 850; }
+.history-entry-button:hover { border-color: #b98735; background: #fff9e9; }
 .fine-print { margin: 1.4rem 0 0; color: #8b816f; font-size: 0.72rem; line-height: 1.6; }
 .language-toggle {
   border: 1px solid rgba(232, 202, 131, .38);
@@ -239,9 +241,13 @@ button:disabled { cursor: not-allowed; opacity: 0.46; }
 .brand span { color: var(--gold-light); margin-right: 0.5rem; }
 .round-status { color: rgba(248, 240, 223, 0.72); font-size: 0.78rem; letter-spacing: 0.1em; }
 .round-status span { color: var(--gold-light); border: 1px solid rgba(232, 202, 131, 0.28); padding: 0.3rem 0.55rem; margin-right: 0.6rem; }
-.header-room, .header-recovery, .header-leave, .header-claim { color: rgba(248, 240, 223, 0.7); background: transparent; border: 0; font-size: 0.68rem; white-space: nowrap; }
+.header-room, .header-recovery, .header-leave, .header-claim, .header-history, .header-sound { color: rgba(248, 240, 223, 0.7); background: transparent; border: 0; font-size: 0.68rem; white-space: nowrap; }
 .header-recovery { color: var(--gold-light); border-bottom: 1px dashed rgba(232,202,131,.35); }
 .header-leave { color: #efb0a8; }
+.header-history { color: var(--gold-light); }
+.header-sound { min-width: 3.6rem; border: 1px solid rgba(232,202,131,.2); border-radius: 999px; padding: .34rem .55rem; }
+.header-sound.enabled { color: #d9efa4; }
+.header-sound.muted { color: rgba(248,240,223,.45); }
 .header-claim { color: #fff; background: #9a7334; border-radius: 2px; padding: .45rem .65rem; }
 .header-rules { color: var(--gold-light); background: transparent; border: 0; font-size: .72rem; font-weight: 800; }
 .network-status { display: flex; align-items: center; gap: .42rem; margin-left: 1.2rem; color: rgba(248, 240, 223, .68); font-size: .68rem; white-space: nowrap; }
@@ -430,6 +436,34 @@ button:disabled { cursor: not-allowed; opacity: 0.46; }
 .draw-modal:has(.many-choices) { width: min(76rem, 100%); max-height: calc(100vh - 2rem); overflow-y: auto; }
 .draw-choices.many-choices { grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); }
 
+.history-backdrop { z-index: 70; align-items: stretch; overflow-y: auto; }
+.history-modal { width: min(58rem, 100%); margin: auto; background: var(--paper); box-shadow: 0 30px 100px rgba(0,0,0,.45); padding: clamp(1.2rem, 4vw, 2.6rem); }
+.history-modal > header { display: flex; align-items: flex-start; justify-content: space-between; gap: 1rem; border-bottom: 1px solid var(--line); padding-bottom: 1rem; }
+.history-modal h2 { margin: .25rem 0 0; font: 900 clamp(2rem,5vw,3.4rem) "Songti SC", serif; }
+.history-modal > header button { width: 2.5rem; height: 2.5rem; border: 1px solid var(--line); background: transparent; color: var(--ink); font-size: 1.5rem; }
+.history-explainer { color: #756c5d; font-size: .75rem; line-height: 1.7; }
+.history-empty { min-height: 15rem; display: grid; place-items: center; align-content: center; gap: .5rem; color: #8c7e68; text-align: center; }
+.history-empty > span { color: #b38a46; font-size: 3rem; }
+.history-empty p { margin: 0; font-size: .72rem; }
+.history-error { border: 1px solid #b9665d; background: #fae8df; color: #8e4138; padding: 1rem; }
+.history-list { display: grid; gap: .8rem; }
+.history-match { border: 1px solid var(--line); background: rgba(255,255,255,.4); }
+.history-match-summary { display: flex; align-items: center; justify-content: space-between; gap: 1rem; padding: 1rem; }
+.history-match-summary span, .history-match-summary small { color: #847966; font-size: .65rem; }
+.history-match-summary h3 { margin: .25rem 0; font: 900 1.35rem "Songti SC", serif; }
+.history-match-summary > strong { color: #9a6f2d; font: 900 1.35rem Georgia, serif; }
+.history-ranking { display: grid; grid-template-columns: repeat(auto-fit, minmax(9rem, 1fr)); border-top: 1px solid var(--line); }
+.history-ranking > div { display: grid; grid-template-columns: 1.4rem 1fr auto; gap: .45rem; padding: .65rem .8rem; border-right: 1px solid var(--line); font-size: .7rem; }
+.history-ranking b { color: #a07937; }
+.history-match details { border-top: 1px solid var(--line); }
+.history-match summary { cursor: pointer; color: #695b45; padding: .75rem 1rem; font-size: .7rem; font-weight: 850; }
+.history-player-details { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: .6rem; padding: 0 1rem 1rem; }
+.history-player-details section { border: 1px solid rgba(29,37,55,.1); background: rgba(255,255,255,.35); padding: .75rem; }
+.history-player-details h4 { margin: 0; font: 900 .9rem "Songti SC", serif; }
+.history-player-details p { min-height: 1rem; margin: .3rem 0 .55rem; color: #7d725f; font-size: .65rem; }
+.history-player-details section > div { display: flex; flex-wrap: wrap; gap: .3rem; }
+.history-player-details section > div span { border-left: 3px solid var(--role-color); background: #fffdf8; color: var(--role-color); padding: .3rem .45rem; font-size: .62rem; }
+
 .finished-stage { padding-top: 4rem; }
 .victory-crown { color: var(--gold); font-size: 5rem; line-height: 1; }
 .ranking { width: min(42rem, 100%); margin: 2rem auto; display: flex; flex-direction: column; gap: .5rem; }
@@ -500,6 +534,7 @@ button:disabled { cursor: not-allowed; opacity: 0.46; }
   .round-status { display: none; }
   .network-status { margin-left: 0; }
   .header-room, .header-recovery { order: 10; font-size: .6rem; }
+  .header-history, .header-sound { font-size: .6rem; }
   .header-leave { order: 11; }
   .game-header .language-toggle { padding: .32rem .55rem; }
   .player-strip { display: flex; overflow-x: auto; }
@@ -527,6 +562,7 @@ button:disabled { cursor: not-allowed; opacity: 0.46; }
   .draw-modal .district-card { min-height: 12rem; }
   .ranking > div { grid-template-columns: 2rem 1fr auto; }
   .ranking > div > small { display: none; }
+  .history-player-details { grid-template-columns: 1fr; }
   .rule-section { grid-template-columns: 2.2rem 1fr; }
   .rule-card-grid, .unique-reference { grid-template-columns: 1fr; }
   .rules-nav { top: 5.4rem; }

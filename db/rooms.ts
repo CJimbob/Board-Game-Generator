@@ -1,5 +1,5 @@
 import { env } from "cloudflare:workers";
-import type { GameState } from "@/lib/game";
+import type { GameState, MatchHistorySummary } from "@/lib/game";
 
 type RoomRow = { state: string; revision: number };
 type PresenceRow = { player_id: string; last_seen_at: string; online: number };
@@ -40,6 +40,23 @@ async function ensureSchema() {
             PRIMARY KEY (key, window)
           )
         `),
+        env.DB.prepare(`
+          CREATE TABLE IF NOT EXISTS game_match_history (
+            id TEXT PRIMARY KEY,
+            room_code TEXT NOT NULL,
+            completed_at TEXT NOT NULL,
+            summary TEXT NOT NULL
+          )
+        `),
+        env.DB.prepare(`
+          CREATE TABLE IF NOT EXISTS game_match_history_players (
+            history_id TEXT NOT NULL,
+            history_key_hash TEXT NOT NULL,
+            player_id TEXT NOT NULL,
+            PRIMARY KEY (history_id, history_key_hash, player_id)
+          )
+        `),
+        env.DB.prepare("CREATE INDEX IF NOT EXISTS game_match_history_players_key_idx ON game_match_history_players (history_key_hash)"),
       ]);
       const columns = await env.DB.prepare("PRAGMA table_info(game_rooms)").all<{ name: string }>();
       if (!columns.results.some((column) => column.name === "revision")) {
@@ -146,4 +163,42 @@ export async function cleanupExpiredRooms() {
     db.prepare(`DELETE FROM game_rooms WHERE updated_at < datetime('now', '-7 days')`),
     db.prepare("DELETE FROM game_rate_limits WHERE window < ?").bind(Math.floor(Date.now() / 60_000) - 5),
   ]);
+}
+
+export async function archiveFinishedMatch(state: GameState, summary: MatchHistorySummary) {
+  if (state.status !== "finished") return;
+  const db = await ensureSchema();
+  const statements = [
+    db.prepare(`
+      INSERT OR IGNORE INTO game_match_history (id, room_code, completed_at, summary)
+      VALUES (?, ?, ?, ?)
+    `).bind(summary.id, summary.code, summary.completedAt, JSON.stringify(summary)),
+    ...state.players
+      .filter((player) => Boolean(player.historyKeyHash))
+      .map((player) => db.prepare(`
+        INSERT OR IGNORE INTO game_match_history_players (history_id, history_key_hash, player_id)
+        VALUES (?, ?, ?)
+      `).bind(summary.id, player.historyKeyHash!, player.id)),
+  ];
+  await db.batch(statements);
+}
+
+export async function listMatchHistory(historyKeyHash: string, limit = 30) {
+  const db = await ensureSchema();
+  const rows = await db.prepare(`
+    SELECT DISTINCT history.summary
+    FROM game_match_history AS history
+    INNER JOIN game_match_history_players AS player_history
+      ON player_history.history_id = history.id
+    WHERE player_history.history_key_hash = ?
+    ORDER BY history.completed_at DESC
+    LIMIT ?
+  `).bind(historyKeyHash, Math.max(1, Math.min(50, limit))).all<{ summary: string }>();
+  return rows.results.flatMap((row) => {
+    try {
+      return [JSON.parse(row.summary) as MatchHistorySummary];
+    } catch {
+      return [];
+    }
+  });
 }

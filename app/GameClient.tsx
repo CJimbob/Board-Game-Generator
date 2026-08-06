@@ -91,13 +91,81 @@ type Game = {
   viewerId: string;
 };
 
+type MatchHistorySummary = {
+  id: string;
+  code: string;
+  rulesetKey: string;
+  round: number;
+  completedAt: string;
+  winnerId: string;
+  players: Array<{
+    id: string;
+    name: string;
+    isBot: boolean;
+    score: number;
+    roleKeys: string[];
+    city: Array<Pick<District, "key" | "name" | "color" | "cost" | "beautified">>;
+  }>;
+};
+
 type Session = { code: string; playerId: string; token: string; recoveryCode?: string };
 type Act = (action: string, payload?: Record<string, unknown>) => Promise<void>;
+type SoundEffect = "soft" | "coin" | "card" | "role" | "build" | "turn" | "finish";
 
 const STORAGE_KEY = "crown-city-session-v2";
 const LANGUAGE_KEY = "crown-city-language";
 const LAST_RECOVERY_KEY = "crown-city-last-recovery";
+const HISTORY_KEY = "crown-city-history-key-v1";
+const SOUND_KEY = "crown-city-sound-v1";
 const INCOME_ROLES = new Set(["king", "patrician", "bishop", "cardinal", "merchant", "trader", "warlord", "diplomat", "marshal"]);
+
+let gameAudioContext: AudioContext | null = null;
+
+function getOrCreateHistoryKey() {
+  const saved = window.localStorage.getItem(HISTORY_KEY);
+  if (saved && saved.length >= 32) return saved;
+  const key = `${crypto.randomUUID().replaceAll("-", "")}${crypto.randomUUID().replaceAll("-", "")}`;
+  window.localStorage.setItem(HISTORY_KEY, key);
+  return key;
+}
+
+function audioContext() {
+  if (typeof window === "undefined") return null;
+  const AudioContextClass = window.AudioContext
+    ?? (window as typeof window & { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
+  if (!AudioContextClass) return null;
+  gameAudioContext ??= new AudioContextClass();
+  return gameAudioContext;
+}
+
+function playGameSound(effect: SoundEffect, enabled = true) {
+  if (!enabled) return;
+  const context = audioContext();
+  if (!context) return;
+  void context.resume();
+  const patterns: Record<SoundEffect, Array<[number, number, OscillatorType]>> = {
+    soft: [[330, 0, "sine"]],
+    coin: [[660, 0, "sine"], [880, 0.08, "sine"]],
+    card: [[260, 0, "triangle"], [390, 0.055, "triangle"]],
+    role: [[330, 0, "triangle"], [494, 0.09, "triangle"]],
+    build: [[220, 0, "triangle"], [330, 0.065, "triangle"], [440, 0.13, "triangle"]],
+    turn: [[523, 0, "sine"], [659, 0.09, "sine"], [784, 0.18, "sine"]],
+    finish: [[523, 0, "triangle"], [659, 0.1, "triangle"], [784, 0.2, "triangle"], [1047, 0.32, "sine"]],
+  };
+  const start = context.currentTime + 0.01;
+  for (const [frequency, offset, type] of patterns[effect]) {
+    const oscillator = context.createOscillator();
+    const gain = context.createGain();
+    oscillator.type = type;
+    oscillator.frequency.setValueAtTime(frequency, start + offset);
+    gain.gain.setValueAtTime(0.0001, start + offset);
+    gain.gain.exponentialRampToValueAtTime(effect === "soft" ? 0.035 : 0.075, start + offset + 0.012);
+    gain.gain.exponentialRampToValueAtTime(0.0001, start + offset + 0.13);
+    oscillator.connect(gain).connect(context.destination);
+    oscillator.start(start + offset);
+    oscillator.stop(start + offset + 0.14);
+  }
+}
 
 const LanguageContext = createContext<{
   language: Language;
@@ -199,7 +267,54 @@ function DistrictCard({ district, action, secondaryAction, disabled, secondaryDi
   );
 }
 
-function Landing({ onCreated, onOpenRules }: { onCreated: (session: Session, game: Game) => void; onOpenRules: () => void }) {
+function HistoryModal({ historyKey, onClose }: { historyKey: string; onClose: () => void }) {
+  const { language, text } = useLanguage();
+  const [history, setHistory] = useState<MatchHistorySummary[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
+
+  useEffect(() => {
+    if (!historyKey) return;
+    const controller = new AbortController();
+    void (async () => {
+      try {
+        const response = await fetch("/api/game", {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({ action: "listHistory", historyKey }),
+          signal: controller.signal,
+        });
+        const data = await response.json() as { history?: MatchHistorySummary[]; error?: string };
+        if (!response.ok || !data.history) throw new Error(data.error ?? text("无法读取历史对局。", "Unable to load match history."));
+        setHistory(data.history);
+      } catch (caught) {
+        if (caught instanceof DOMException && caught.name === "AbortError") return;
+        setError(caught instanceof Error ? translatedError(caught.message, language) : text("无法读取历史对局。", "Unable to load match history."));
+      } finally {
+        setLoading(false);
+      }
+    })();
+    return () => controller.abort();
+  }, [historyKey, language, text]);
+
+  return <div className="modal-backdrop history-backdrop" onMouseDown={(event) => { if (event.target === event.currentTarget) onClose(); }}><section className="history-modal" role="dialog" aria-modal="true" aria-labelledby="history-title"><header><div><div className="eyebrow">{text("服务器保存 · 本设备身份", "Saved on server · this device")}</div><h2 id="history-title">{text("历史对局", "Match history")}</h2></div><button onClick={onClose} aria-label={text("关闭历史对局", "Close match history")}>×</button></header>
+    <p className="history-explainer">{text("完成后的比分、角色和城市会保存在服务器。历史记录与这台设备的匿名身份关联，不需要注册账号。", "Final scores, characters, and cities are saved on the server. History is linked to an anonymous identity on this device; no account is required.")}</p>
+    {loading && <div className="history-empty">{text("正在翻阅王城档案…", "Opening the city archives…")}</div>}
+    {error && <div className="history-error" role="alert">{error}</div>}
+    {!loading && !error && !history.length && <div className="history-empty"><span>♜</span><strong>{text("还没有完成的对局", "No completed matches yet")}</strong><p>{text("完成一局后，结算结果会自动出现在这里。", "Finish a game and its result will appear here automatically.")}</p></div>}
+    <div className="history-list">{history.map((match) => {
+      const highestRank = (player: MatchHistorySummary["players"][number]) => Math.max(0, ...player.roleKeys.map((key) => ROLES.find((role) => role.key === key)?.rank ?? 0));
+      const ranking = [...match.players].sort((a, b) => b.score - a.score || highestRank(b) - highestRank(a));
+      const winner = match.players.find((player) => player.id === match.winnerId) ?? ranking[0];
+      const rulesetSource = RULESETS.find((ruleset) => ruleset.key === match.rulesetKey) ?? RULESETS[0];
+      const ruleset = localizedRuleset(rulesetSource, language);
+      const date = new Intl.DateTimeFormat(language === "en" ? "en-GB" : "zh-CN", { dateStyle: "medium", timeStyle: "short" }).format(new Date(match.completedAt));
+      return <article className="history-match" key={match.id}><div className="history-match-summary"><div><span>{date} · {text(`房间 ${match.code}`, `Room ${match.code}`)}</span><h3>♛ {winner?.name ?? text("未知城主", "Unknown leader")}</h3><small>{ruleset.name} · {text(`${match.round} 轮`, `${match.round} rounds`)}</small></div><strong>{text(`${winner?.score ?? 0} 分`, `${winner?.score ?? 0} pts`)}</strong></div><div className="history-ranking">{ranking.map((player, index) => <div key={player.id}><b>{index + 1}</b><span>{player.name}{player.isBot ? " · AI" : ""}</span><strong>{player.score}</strong></div>)}</div><details><summary>{text("查看角色与城市", "View characters and cities")}</summary><div className="history-player-details">{ranking.map((player) => <section key={player.id}><h4>{player.name}</h4><p>{player.roleKeys.map((key) => { const role = ROLES.find((candidate) => candidate.key === key); return role ? localizedRole(role, language).name : key; }).join(language === "en" ? ", " : "、") || text("无公开角色", "No revealed characters")}</p><div>{player.city.map((district, index) => <span key={`${district.key}-${index}`} className={`color-${district.color}`}>{localizedDistrict(district, language).name} · {district.cost + (district.beautified ? 1 : 0)}</span>)}</div></section>)}</div></details></article>;
+    })}</div>
+  </section></div>;
+}
+
+function Landing({ historyKey, onCreated, onOpenRules, onOpenHistory }: { historyKey: string; onCreated: (session: Session, game: Game) => void; onOpenRules: () => void; onOpenHistory: () => void }) {
   const { language, text } = useLanguage();
   const [name, setName] = useState("");
   const [code, setCode] = useState("");
@@ -227,7 +342,7 @@ function Landing({ onCreated, onOpenRules }: { onCreated: (session: Session, gam
   async function submit(action: "create" | "join" | "recover") {
     setBusy(true); setError("");
     try {
-      const response = await fetch("/api/game", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ action, name, code, recoveryCode, botCount, rulesetKey, includeRankNine }) });
+      const response = await fetch("/api/game", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ action, name, code, recoveryCode, botCount, rulesetKey, includeRankNine, historyKey: historyKey || getOrCreateHistoryKey() }) });
       const data = await response.json() as { error?: string; session?: Session; game?: Game };
       if (!response.ok || !data.session || !data.game) throw new Error(translatedError(data.error ?? text("暂时无法进入房间。", "Unable to enter the room right now."), language));
       onCreated(data.session, data.game);
@@ -257,7 +372,7 @@ function Landing({ onCreated, onOpenRules }: { onCreated: (session: Session, gam
         <div className="divider"><span>{text("或者输入朋友的房间码", "Or enter a friend's room code")}</span></div>
         <div className="join-row"><input className="code-input" value={code} onChange={(event) => setCode(event.target.value.toUpperCase().replace(/[^A-Z0-9]/g, "").slice(0, 4))} placeholder="AB12" maxLength={4} aria-label={text("四位房间码", "Four-character room code")} /><button className="secondary-button" onClick={() => submit("join")} disabled={busy}>{text("加入房间", "Join room")}</button></div>
         <details className="recovery-entry"><summary>{text("换设备？用恢复码返回座位", "Changed devices? Recover your seat")}</summary><label>{text("10 位恢复码", "10-character recovery code")}<input value={recoveryCode} onChange={(event) => setRecoveryCode(event.target.value.toUpperCase().replace(/[^A-Z0-9]/g, "").slice(0, 10))} placeholder="ABCD23WXYZ" maxLength={10} autoComplete="off" /></label><button className="secondary-button" onClick={() => submit("recover")} disabled={busy || code.length !== 4 || recoveryCode.length !== 10}>{text("恢复原座位", "Recover seat")}</button></details>
-        {error && <p className="form-error" role="alert">{error}</p>}<p className="fine-print">{text("无需注册或模型密钥。策略电脑由服务器按规则运行；恢复码可让你在另一台设备返回座位。", "No account or model key required. Strategy AI follows the rules on the server; your recovery code lets you return from another device.")}</p>
+        {error && <p className="form-error" role="alert">{error}</p>}<button className="history-entry-button" onClick={onOpenHistory}>♜ {text("查看历史对局", "View match history")}</button><p className="fine-print">{text("无需注册或模型密钥。策略电脑由服务器按规则运行；完成的对局会保存到王城档案。", "No account or model key required. Strategy AI follows the rules on the server; completed matches are saved in the city archive.")}</p>
       </section>
     </main>
   );
@@ -434,9 +549,39 @@ function GameTable() {
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
   const [rulesOpen, setRulesOpen] = useState(false);
+  const [historyOpen, setHistoryOpen] = useState(false);
+  const [historyKey] = useState(() => typeof window === "undefined" ? "" : getOrCreateHistoryKey());
+  const [soundEnabled, setSoundEnabled] = useState(() => typeof window === "undefined" || window.localStorage.getItem(SOUND_KEY) !== "off");
   const [connection, setConnection] = useState<"connecting" | "online" | "offline">("connecting");
   const refreshAbortRef = useRef<AbortController | null>(null);
   const leavingRef = useRef(false);
+  const previousGameRef = useRef<Pick<Game, "status" | "currentPlayerId" | "currentPickerId" | "viewerId"> | null>(null);
+
+  useEffect(() => {
+    if (!soundEnabled) return;
+    const unlock = () => { const context = audioContext(); if (context) void context.resume(); };
+    window.addEventListener("pointerdown", unlock, { once: true });
+    return () => window.removeEventListener("pointerdown", unlock);
+  }, [soundEnabled]);
+  useEffect(() => {
+    if (!game) { previousGameRef.current = null; return; }
+    const previous = previousGameRef.current;
+    if (previous) {
+      if (game.status === "finished" && previous.status !== "finished") {
+        playGameSound("finish", soundEnabled);
+      } else if (game.status === "turns" && game.currentPlayerId === game.viewerId && previous.currentPlayerId !== game.viewerId) {
+        playGameSound("turn", soundEnabled);
+      } else if (game.status === "draft" && game.currentPickerId === game.viewerId && previous.currentPickerId !== game.viewerId) {
+        playGameSound("turn", soundEnabled);
+      }
+    }
+    previousGameRef.current = {
+      status: game.status,
+      currentPlayerId: game.currentPlayerId,
+      currentPickerId: game.currentPickerId,
+      viewerId: game.viewerId,
+    };
+  }, [game, soundEnabled]);
 
   useEffect(() => {
     const saved = window.localStorage.getItem(STORAGE_KEY);
@@ -480,11 +625,13 @@ function GameTable() {
     if (nextSession.recoveryCode) window.localStorage.setItem(LAST_RECOVERY_KEY, JSON.stringify({ code: nextSession.code, recoveryCode: nextSession.recoveryCode }));
     setSession(nextSession);
   }, []);
-  function enter(nextSession: Session, nextGame: Game) { leavingRef.current = false; saveSession(nextSession); setGame(nextGame); setConnection("online"); setError(""); }
+  function enter(nextSession: Session, nextGame: Game) { leavingRef.current = false; playGameSound("soft", soundEnabled); saveSession(nextSession); setGame(nextGame); setConnection("online"); setError(""); }
   const act = useCallback(async (action: string, payload: Record<string, unknown> = {}) => {
     if (!session || busy) return; setBusy(true); setError(""); let reachedServer = false;
+    const actionSounds: Partial<Record<string, SoundEffect>> = { chooseRole: "role", takeGold: "coin", drawCards: "card", keepCard: "card", build: "build", roleIncome: "coin", ability: "role", districtAbility: "build", endTurn: "soft", start: "role" };
+    if (actionSounds[action]) playGameSound(actionSounds[action]!, soundEnabled);
     try {
-      const response = await fetch("/api/game", { method: "POST", headers: { "content-type": "application/json", authorization: `Bearer ${session.token}`, "x-player-id": session.playerId }, body: JSON.stringify({ action, code: session.code, ...payload }) });
+      const response = await fetch("/api/game", { method: "POST", headers: { "content-type": "application/json", authorization: `Bearer ${session.token}`, "x-player-id": session.playerId }, body: JSON.stringify({ action, code: session.code, historyKey: historyKey || getOrCreateHistoryKey(), ...payload }) });
       reachedServer = true; setConnection("online");
       const data = await response.json() as { game?: Game; session?: Session; error?: string };
       if (!response.ok || !data.game) throw new Error(data.error ?? text("操作失败。", "Action failed."));
@@ -493,7 +640,7 @@ function GameTable() {
     }
     catch (caught) { if (!reachedServer) setConnection("offline"); setError(caught instanceof Error ? translatedError(caught.message, language) : text("操作失败。", "Action failed.")); if (reachedServer) void refresh(true); }
     finally { setBusy(false); }
-  }, [session, busy, language, text, refresh, saveSession]);
+  }, [session, busy, language, text, refresh, saveSession, historyKey, soundEnabled]);
   const phaseLabel = useMemo(() => game ? (language === "en" ? ({ lobby: "Lobby", draft: "Draft", theater: "Theater", turns: "Turns", finished: "Scoring" }[game.status]) : ({ lobby: "候场", draft: "选角", theater: "剧院", turns: "行动", finished: "结算" }[game.status])) : "", [game, language]);
   function hideTable() { setSession(null); setGame(null); setError(""); setConnection("connecting"); }
   async function leaveSeat() {
@@ -502,7 +649,7 @@ function GameTable() {
     refreshAbortRef.current?.abort();
     setBusy(true);
     try {
-      const response = await fetch("/api/game", { method: "POST", headers: { "content-type": "application/json", authorization: `Bearer ${session.token}`, "x-player-id": session.playerId }, body: JSON.stringify({ action: "leaveRoom", code: session.code }) });
+      const response = await fetch("/api/game", { method: "POST", headers: { "content-type": "application/json", authorization: `Bearer ${session.token}`, "x-player-id": session.playerId }, body: JSON.stringify({ action: "leaveRoom", code: session.code, historyKey: historyKey || getOrCreateHistoryKey() }) });
       const data = await response.json() as { left?: boolean; error?: string };
       if (!response.ok || !data.left) throw new Error(data.error ?? text("退出失败。", "Unable to leave."));
       if (session.recoveryCode) window.localStorage.setItem(LAST_RECOVERY_KEY, JSON.stringify({ code: session.code, recoveryCode: session.recoveryCode }));
@@ -515,11 +662,17 @@ function GameTable() {
     await navigator.clipboard.writeText(`${session.code} ${session.recoveryCode}`);
     setError(text("恢复码已复制；请像密码一样妥善保存。", "Recovery code copied. Store it like a password."));
   }
+  function toggleSound() {
+    const next = !soundEnabled;
+    setSoundEnabled(next);
+    window.localStorage.setItem(SOUND_KEY, next ? "on" : "off");
+    if (next) playGameSound("turn", true);
+  }
 
-  if (!session) return <>{rulesOpen && <RulesModal onClose={() => setRulesOpen(false)} />}<Landing onCreated={enter} onOpenRules={() => setRulesOpen(true)} /></>;
+  if (!session) return <>{rulesOpen && <RulesModal onClose={() => setRulesOpen(false)} />}{historyOpen && <HistoryModal historyKey={historyKey} onClose={() => setHistoryOpen(false)} />}<Landing historyKey={historyKey} onCreated={enter} onOpenRules={() => setRulesOpen(true)} onOpenHistory={() => setHistoryOpen(true)} /></>;
   if (!game) return <main className="loading-screen"><LanguageToggle /><span>♛</span><p>{error || text("正在返回牌桌…", "Returning to the table…")}</p><button onClick={hideTable}>{text("回到首页", "Back to home")}</button></main>;
   const host = game.players.find((player) => player.id === game.hostId);
-  return <main className={`game-shell ${busy ? "is-busy" : ""}`}>{rulesOpen && <RulesModal onClose={() => setRulesOpen(false)} />}<header className="game-header"><button className="brand" onClick={hideTable}><span>♛</span> {text("王冠之城", "Crown City")}</button><div className="round-status"><span>{phaseLabel}</span>{game.round > 0 && text(`第 ${game.round} 轮`, `Round ${game.round}`)}</div><div className={`network-status ${connection}`}><i aria-hidden="true" />{connection === "online" ? text("在线同步", "Synced") : connection === "offline" ? text("网络中断", "Offline") : text("正在连接", "Connecting")}</div><button className="header-rules" onClick={() => setRulesOpen(true)}>{text("规则书", "Rules")}</button><LanguageToggle /><button className="header-room" onClick={() => navigator.clipboard.writeText(`${window.location.origin}/?room=${game.code}`)}>{text(`房间 ${game.code} · 复制邀请`, `Room ${game.code} · Copy invite`)}</button><button className="header-recovery" onClick={copyRecoveryCode}>{session.recoveryCode ? text(`恢复码 ${session.recoveryCode} · 复制`, `Recovery ${session.recoveryCode} · Copy`) : text("生成恢复码", "Create recovery code")}</button><button className="header-leave" onClick={leaveSeat}>{text("退出牌局", "Leave table")}</button>{game.viewerId !== game.hostId && host && !host.isBot && !host.isOnline && <button className="header-claim" onClick={() => act("claimHost")}>{text("接任房主", "Take host")}</button>}</header><PlayerStrip game={game} act={act} />{error && <div className="toast" role="alert">{error}<button onClick={() => setError("")}>×</button></div>}{game.status === "lobby" && <Lobby game={game} act={act} />}{game.status === "draft" && <Draft game={game} act={act} />}{game.status === "theater" && <TheaterPhase game={game} act={act} />}{game.status === "turns" && <Turns game={game} act={act} />}{game.status === "finished" && <Finished game={game} act={act} />}</main>;
+  return <main className={`game-shell ${busy ? "is-busy" : ""}`}>{rulesOpen && <RulesModal onClose={() => setRulesOpen(false)} />}{historyOpen && <HistoryModal historyKey={historyKey} onClose={() => setHistoryOpen(false)} />}<header className="game-header"><button className="brand" onClick={hideTable}><span>♛</span> {text("王冠之城", "Crown City")}</button><div className="round-status"><span>{phaseLabel}</span>{game.round > 0 && text(`第 ${game.round} 轮`, `Round ${game.round}`)}</div><div className={`network-status ${connection}`}><i aria-hidden="true" />{connection === "online" ? text("在线同步", "Synced") : connection === "offline" ? text("网络中断", "Offline") : text("正在连接", "Connecting")}</div><button className="header-history" onClick={() => setHistoryOpen(true)}>♜ {text("历史", "History")}</button><button className={`header-sound ${soundEnabled ? "enabled" : "muted"}`} onClick={toggleSound} aria-pressed={soundEnabled}>{soundEnabled ? "♪ " : "× "}{text(soundEnabled ? "音效" : "静音", soundEnabled ? "Sound" : "Muted")}</button><button className="header-rules" onClick={() => setRulesOpen(true)}>{text("规则书", "Rules")}</button><LanguageToggle /><button className="header-room" onClick={() => navigator.clipboard.writeText(`${window.location.origin}/?room=${game.code}`)}>{text(`房间 ${game.code} · 复制邀请`, `Room ${game.code} · Copy invite`)}</button><button className="header-recovery" onClick={copyRecoveryCode}>{session.recoveryCode ? text(`恢复码 ${session.recoveryCode} · 复制`, `Recovery ${session.recoveryCode} · Copy`) : text("生成恢复码", "Create recovery code")}</button><button className="header-leave" onClick={leaveSeat}>{text("退出牌局", "Leave table")}</button>{game.viewerId !== game.hostId && host && !host.isBot && !host.isOnline && <button className="header-claim" onClick={() => act("claimHost")}>{text("接任房主", "Take host")}</button>}</header><PlayerStrip game={game} act={act} />{error && <div className="toast" role="alert">{error}<button onClick={() => setError("")}>×</button></div>}{game.status === "lobby" && <Lobby game={game} act={act} />}{game.status === "draft" && <Draft game={game} act={act} />}{game.status === "theater" && <TheaterPhase game={game} act={act} />}{game.status === "turns" && <Turns game={game} act={act} />}{game.status === "finished" && <Finished game={game} act={act} />}</main>;
 }
 
 export function GameClient() {

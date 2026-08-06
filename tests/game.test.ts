@@ -7,6 +7,7 @@ import {
   chooseRole,
   createDistrictDeck,
   createGameState,
+  createMatchHistorySummary,
   currentPickerId,
   endTurn,
   entrustPlayerToBot,
@@ -16,6 +17,7 @@ import {
   processBots,
   publicGameView,
   removeLobbyPlayer,
+  restartGame,
   restorePlayerSeat,
   startGame,
   takeGold,
@@ -147,6 +149,26 @@ test("scoring includes completion and unique district bonuses", () => {
   assert.equal(score.completion, 4);
   assert.equal(score.unique, 2);
   assert.equal(score.total, 30);
+});
+
+test("completed matches produce a durable public history summary without seat secrets", () => {
+  const { state, host } = createGameState("ARCH", "档案城主", 1);
+  state.status = "finished";
+  state.round = 6;
+  host.recoveryHash = "private-recovery-hash";
+  host.historyKeyHash = "private-history-hash";
+  host.city = [{ uid: "archive-city", key: "palace", name: "宫殿", color: "yellow", cost: 5 }];
+  const summary = createMatchHistorySummary(state);
+  assert.equal(summary.code, "ARCH");
+  assert.equal(summary.round, 6);
+  assert.equal(summary.players[0].city[0].name, "宫殿");
+  assert.equal("token" in summary.players[0], false);
+  assert.equal("recoveryHash" in summary.players[0], false);
+  assert.equal("historyKeyHash" in summary.players[0], false);
+  const firstMatchId = summary.id;
+  restartGame(state, host.id);
+  state.status = "finished";
+  assert.notEqual(createMatchHistorySummary(state).id, firstMatchId);
 });
 
 test("computer players can advance every official ruleset without a stalled turn", () => {

@@ -29,6 +29,7 @@ export type PlayerState = {
   id: string;
   token: string;
   recoveryHash?: string;
+  historyKeyHash?: string;
   name: string;
   isBot: boolean;
   gold: number;
@@ -83,6 +84,7 @@ export type GameState = {
   privateNotes: Record<string, string[]>;
   log: string[];
   version: number;
+  matchId?: string;
   createdAt: string;
   updatedAt: string;
 };
@@ -230,6 +232,7 @@ export function createGameState(
     privateNotes: {},
     log: [`${host.name} 建立了房间，规则套组为“${getRuleset(rulesetKey).name}”。`],
     version: 1,
+    matchId: randomId("match"),
     createdAt: now,
     updatedAt: now,
   };
@@ -466,6 +469,7 @@ export function restartGame(state: GameState, playerId: string) {
   if (state.hostId !== playerId) throw new Error("只有房主可以重新开局。 ");
   if (state.status !== "finished") throw new Error("当前游戏尚未结束。 ");
   state.status = "lobby";
+  state.matchId = randomId("match");
   state.round = 0;
   state.cast = [];
   state.deck = [];
@@ -1832,6 +1836,50 @@ export function playerScoreBreakdown(state: GameState, player: PlayerState) {
 
 export function playerScore(state: GameState, player: PlayerState) {
   return playerScoreBreakdown(state, player).total;
+}
+
+export type MatchHistorySummary = {
+  id: string;
+  code: string;
+  rulesetKey: string;
+  round: number;
+  completedAt: string;
+  winnerId: string;
+  players: Array<{
+    id: string;
+    name: string;
+    isBot: boolean;
+    score: number;
+    roleKeys: string[];
+    city: Array<Pick<DistrictCard, "key" | "name" | "color" | "cost" | "beautified">>;
+  }>;
+};
+
+export function createMatchHistorySummary(state: GameState): MatchHistorySummary {
+  const highestRank = (player: PlayerState) => Math.max(0, ...player.roleKeys.map((key) => getRole(key)?.rank ?? 0));
+  const ranked = [...state.players].sort((a, b) => playerScore(state, b) - playerScore(state, a) || highestRank(b) - highestRank(a));
+  return {
+    id: `${state.code}:${state.matchId ?? state.createdAt}`,
+    code: state.code,
+    rulesetKey: state.rulesetKey,
+    round: state.round,
+    completedAt: state.updatedAt,
+    winnerId: ranked[0]?.id ?? "",
+    players: state.players.map((player) => ({
+      id: player.id,
+      name: player.name,
+      isBot: player.isBot,
+      score: playerScore(state, player),
+      roleKeys: [...player.roleKeys],
+      city: player.city.map((district) => ({
+        key: district.key,
+        name: district.name,
+        color: district.color,
+        cost: district.cost,
+        beautified: district.beautified,
+      })),
+    })),
+  };
 }
 
 function publicPendingChoice(state: GameState, viewerId: string) {
