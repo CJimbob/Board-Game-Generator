@@ -84,8 +84,12 @@ type Game = {
   allUniqueDistricts: District[];
   taxPool: number;
   pendingChoice: PendingChoice | null;
+  assassinatedRoleKey: string | null;
+  robbedRoleKey: string | null;
+  bewitchedRoleKey: string | null;
   privateNotes: string[];
   players: Player[];
+  roundLog: string[];
   log: string[];
   version: number;
   viewerId: string;
@@ -409,9 +413,41 @@ function Lobby({ game, act }: { game: Game; act: Act }) {
   </section>;
 }
 
+function RoundRoleTrack({ game }: { game: Game }) {
+  const { language, text } = useLanguage();
+  const roles = [...game.roles].sort((a, b) => a.rank - b.rank);
+  const resolvedCount = game.status === "finished"
+    ? roles.length
+    : game.status === "turns" && game.currentRank !== null
+      ? roles.filter((role) => role.rank < game.currentRank!).length
+      : 0;
+  return <section className="round-role-tracker" aria-label={text("本轮角色行动顺序", "Character order this round")}><header><div><span>◆</span><strong>{text("本轮角色行动", "Characters this round")}</strong><small>{text(`第 ${game.round} 轮`, `Round ${game.round}`)}</small></div><b>{game.status === "draft" || game.status === "theater" ? text("秘密选角中", "Secret draft") : text(`已处理 ${resolvedCount}/${roles.length}`, `${resolvedCount}/${roles.length} resolved`)}</b></header><div className="round-role-scroll"><ol>{roles.map((source) => {
+    const role = localizedRole(source, language);
+    const owner = game.players.find((player) => player.roleKeys.includes(source.key));
+    const isRevealed = Boolean(owner?.revealedRoleKeys.includes(source.key)) || game.status === "finished";
+    const isCurrent = game.currentRoleKey === source.key;
+    const isPassed = game.status === "finished" || (game.status === "turns" && game.currentRank !== null && source.rank < game.currentRank);
+    const isDiscarded = game.faceupDiscardedRoleKeys.includes(source.key);
+    const isAssassinated = game.assassinatedRoleKey === source.key;
+    let status = "pending";
+    let statusLabel = text("等待叫号", "Waiting");
+    if (isCurrent) { status = "current"; statusLabel = text("正在行动", "Acting now"); }
+    else if (isDiscarded) { status = "skipped"; statusLabel = text("明置弃牌", "Face-up discard"); }
+    else if (isAssassinated) { status = "attacked"; statusLabel = text("被刺客点名", "Assassin target"); }
+    else if (isPassed && owner) { status = "done"; statusLabel = text("已行动", "Acted"); }
+    else if (isPassed) { status = "skipped"; statusLabel = text("无人回应", "No response"); }
+    else if (game.status === "draft" || game.status === "theater") { statusLabel = text("身份隐藏", "Identity hidden"); }
+    const ownerLabel = owner
+      ? isRevealed ? owner.name : owner.id === game.viewerId ? text("你 · 仅你可见", "You · private") : text("身份未公开", "Identity hidden")
+      : text("尚未揭晓", "Not revealed");
+    return <li key={source.key} className={`round-role-step ${status} color-${role.color}`}><span className="round-role-rank">{role.rank}</span><div><strong>{role.name}</strong><small>{ownerLabel}</small></div><em>{statusLabel}</em><div className="round-role-effects">{isAssassinated && <span className="effect-assassin">† {text("刺杀", "Assassin")}</span>}{game.robbedRoleKey === source.key && <span className="effect-robbed">● {text("盗窃目标", "Robbery target")}</span>}{game.bewitchedRoleKey === source.key && <span className="effect-bewitched">✦ {text("施法目标", "Bewitched")}</span>}</div></li>;
+  })}</ol></div></section>;
+}
+
 function Chronicle({ game }: { game: Game }) {
   const { language, text } = useLanguage();
-  return <aside className="chronicle"><div className="chronicle-heading"><span>◆</span><h3>{text("王城纪事", "City chronicle")}</h3></div><ol>{[...game.log].reverse().map((entry, index) => <li key={`${entry}-${index}`}>{translatedGameMessage(entry, language)}</li>)}</ol></aside>;
+  const currentRound = game.roundLog.length ? game.roundLog : [text("本轮尚无公开行动。", "No public actions this round yet.")];
+  return <aside className="chronicle"><div className="chronicle-heading"><span>◆</span><div><h3>{text("本轮行动", "This round")}</h3><small>{text(`第 ${game.round} 轮 · 最新在前`, `Round ${game.round} · newest first`)}</small></div></div><ol className="round-chronicle">{[...currentRound].reverse().map((entry, index) => <li key={`${entry}-${index}`}>{translatedGameMessage(entry, language)}</li>)}</ol><details className="full-chronicle"><summary>{text("查看整局记录", "View full match log")}</summary><ol>{[...game.log].reverse().map((entry, index) => <li key={`${entry}-${index}`}>{translatedGameMessage(entry, language)}</li>)}</ol></details></aside>;
 }
 
 function DraftTableOverview({ game, onReturn }: { game: Game; onReturn: () => void }) {
@@ -672,7 +708,7 @@ function GameTable() {
   if (!session) return <>{rulesOpen && <RulesModal onClose={() => setRulesOpen(false)} />}{historyOpen && <HistoryModal historyKey={historyKey} onClose={() => setHistoryOpen(false)} />}<Landing historyKey={historyKey} onCreated={enter} onOpenRules={() => setRulesOpen(true)} onOpenHistory={() => setHistoryOpen(true)} /></>;
   if (!game) return <main className="loading-screen"><LanguageToggle /><span>♛</span><p>{error || text("正在返回牌桌…", "Returning to the table…")}</p><button onClick={hideTable}>{text("回到首页", "Back to home")}</button></main>;
   const host = game.players.find((player) => player.id === game.hostId);
-  return <main className={`game-shell ${busy ? "is-busy" : ""}`}>{rulesOpen && <RulesModal onClose={() => setRulesOpen(false)} />}{historyOpen && <HistoryModal historyKey={historyKey} onClose={() => setHistoryOpen(false)} />}<header className="game-header"><button className="brand" onClick={hideTable}><span>♛</span> {text("王冠之城", "Crown City")}</button><div className="round-status"><span>{phaseLabel}</span>{game.round > 0 && text(`第 ${game.round} 轮`, `Round ${game.round}`)}</div><div className={`network-status ${connection}`}><i aria-hidden="true" />{connection === "online" ? text("在线同步", "Synced") : connection === "offline" ? text("网络中断", "Offline") : text("正在连接", "Connecting")}</div><button className="header-history" onClick={() => setHistoryOpen(true)}>♜ {text("历史", "History")}</button><button className={`header-sound ${soundEnabled ? "enabled" : "muted"}`} onClick={toggleSound} aria-pressed={soundEnabled}>{soundEnabled ? "♪ " : "× "}{text(soundEnabled ? "音效" : "静音", soundEnabled ? "Sound" : "Muted")}</button><button className="header-rules" onClick={() => setRulesOpen(true)}>{text("规则书", "Rules")}</button><LanguageToggle /><button className="header-room" onClick={() => navigator.clipboard.writeText(`${window.location.origin}/?room=${game.code}`)}>{text(`房间 ${game.code} · 复制邀请`, `Room ${game.code} · Copy invite`)}</button><button className="header-recovery" onClick={copyRecoveryCode}>{session.recoveryCode ? text(`恢复码 ${session.recoveryCode} · 复制`, `Recovery ${session.recoveryCode} · Copy`) : text("生成恢复码", "Create recovery code")}</button><button className="header-leave" onClick={leaveSeat}>{text("退出牌局", "Leave table")}</button>{game.viewerId !== game.hostId && host && !host.isBot && !host.isOnline && <button className="header-claim" onClick={() => act("claimHost")}>{text("接任房主", "Take host")}</button>}</header><PlayerStrip game={game} act={act} />{error && <div className="toast" role="alert">{error}<button onClick={() => setError("")}>×</button></div>}{game.status === "lobby" && <Lobby game={game} act={act} />}{game.status === "draft" && <Draft game={game} act={act} />}{game.status === "theater" && <TheaterPhase game={game} act={act} />}{game.status === "turns" && <Turns game={game} act={act} />}{game.status === "finished" && <Finished game={game} act={act} />}</main>;
+  return <main className={`game-shell ${busy ? "is-busy" : ""}`}>{rulesOpen && <RulesModal onClose={() => setRulesOpen(false)} />}{historyOpen && <HistoryModal historyKey={historyKey} onClose={() => setHistoryOpen(false)} />}<header className="game-header"><button className="brand" onClick={hideTable}><span>♛</span> {text("王冠之城", "Crown City")}</button><div className="round-status"><span>{phaseLabel}</span>{game.round > 0 && text(`第 ${game.round} 轮`, `Round ${game.round}`)}</div><div className={`network-status ${connection}`}><i aria-hidden="true" />{connection === "online" ? text("在线同步", "Synced") : connection === "offline" ? text("网络中断", "Offline") : text("正在连接", "Connecting")}</div><button className="header-history" onClick={() => setHistoryOpen(true)}>♜ {text("历史", "History")}</button><button className={`header-sound ${soundEnabled ? "enabled" : "muted"}`} onClick={toggleSound} aria-pressed={soundEnabled}>{soundEnabled ? "♪ " : "× "}{text(soundEnabled ? "音效" : "静音", soundEnabled ? "Sound" : "Muted")}</button><button className="header-rules" onClick={() => setRulesOpen(true)}>{text("规则书", "Rules")}</button><LanguageToggle /><button className="header-room" onClick={() => navigator.clipboard.writeText(`${window.location.origin}/?room=${game.code}`)}>{text(`房间 ${game.code} · 复制邀请`, `Room ${game.code} · Copy invite`)}</button><button className="header-recovery" onClick={copyRecoveryCode}>{session.recoveryCode ? text(`恢复码 ${session.recoveryCode} · 复制`, `Recovery ${session.recoveryCode} · Copy`) : text("生成恢复码", "Create recovery code")}</button><button className="header-leave" onClick={leaveSeat}>{text("退出牌局", "Leave table")}</button>{game.viewerId !== game.hostId && host && !host.isBot && !host.isOnline && <button className="header-claim" onClick={() => act("claimHost")}>{text("接任房主", "Take host")}</button>}</header><PlayerStrip game={game} act={act} />{game.status !== "lobby" && <RoundRoleTrack game={game} />}{error && <div className="toast" role="alert">{error}<button onClick={() => setError("")}>×</button></div>}{game.status === "lobby" && <Lobby game={game} act={act} />}{game.status === "draft" && <Draft game={game} act={act} />}{game.status === "theater" && <TheaterPhase game={game} act={act} />}{game.status === "turns" && <Turns game={game} act={act} />}{game.status === "finished" && <Finished game={game} act={act} />}</main>;
 }
 
 export function GameClient() {

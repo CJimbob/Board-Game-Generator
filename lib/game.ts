@@ -83,6 +83,7 @@ export type GameState = {
   firstCompletedPlayerId: string | null;
   privateNotes: Record<string, string[]>;
   log: string[];
+  roundLog?: string[];
   version: number;
   matchId?: string;
   createdAt: string;
@@ -135,6 +136,16 @@ function touch(state: GameState) {
 function addLog(state: GameState, message: string) {
   state.log.push(message);
   if (state.log.length > 120) state.log = state.log.slice(-120);
+  if (state.round > 0 && state.status !== "lobby") {
+    if (!state.roundLog) {
+      const roundMarker = `第 ${state.round} 轮开始`;
+      const roundStart = state.log.findLastIndex((entry) => entry.startsWith(roundMarker));
+      state.roundLog = roundStart >= 0 ? state.log.slice(roundStart) : [message];
+    } else {
+      state.roundLog.push(message);
+    }
+    if (state.roundLog.length > 48) state.roundLog = state.roundLog.slice(-48);
+  }
 }
 
 function addPrivateNote(state: GameState, playerId: string, message: string) {
@@ -231,6 +242,7 @@ export function createGameState(
     firstCompletedPlayerId: null,
     privateNotes: {},
     log: [`${host.name} 建立了房间，规则套组为“${getRuleset(rulesetKey).name}”。`],
+    roundLog: [],
     version: 1,
     matchId: randomId("match"),
     createdAt: now,
@@ -409,6 +421,7 @@ function beginDraft(state: GameState) {
   state.blackmailerPlayerId = null;
   state.pendingChoice = null;
   state.privateNotes = {};
+  state.roundLog = [];
   state.faceupDiscardedRoleKeys = [];
   state.facedownRoleKey = null;
   state.draftIndex = 0;
@@ -488,6 +501,7 @@ export function restartGame(state: GameState, playerId: string) {
     resetTurn(player);
   }
   state.log = ["新的一局已经准备好。"];
+  state.roundLog = [];
   touch(state);
 }
 
@@ -1927,6 +1941,9 @@ export function publicGameView(
     allUniqueDistricts: UNIQUE_DISTRICTS,
     taxPool: state.taxPool,
     pendingChoice: publicPendingChoice(state, viewerId),
+    assassinatedRoleKey: state.assassinatedRoleKey,
+    robbedRoleKey: state.robbedRoleKey,
+    bewitchedRoleKey: state.bewitchedRoleKey,
     privateNotes: state.privateNotes[viewerId] ?? [],
     players: state.players.map((player) => {
       const visibleRoles = player.id === viewerId || state.status === "finished"
@@ -1958,6 +1975,11 @@ export function publicGameView(
         scoreBreakdown: state.status === "finished" ? breakdown : undefined,
       };
     }),
+    roundLog: (state.roundLog ?? (() => {
+      const roundMarker = `第 ${state.round} 轮开始`;
+      const roundStart = state.log.findLastIndex((entry) => entry.startsWith(roundMarker));
+      return roundStart >= 0 ? state.log.slice(roundStart) : [];
+    })()).slice(-48),
     log: state.log.slice(-32),
     version: state.version,
     viewerId: viewer.id,

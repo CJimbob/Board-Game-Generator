@@ -287,6 +287,33 @@ button:disabled { cursor: not-allowed; opacity: 0.46; }
 .player-facts span:first-child { color: var(--gold-light); }
 .role-token { grid-column: 1 / -1; color: rgba(255, 255, 255, 0.42); font-size: 0.64rem; padding-left: 3.25rem; margin-top: -0.45rem; }
 
+.round-role-tracker { position: sticky; top: 0; z-index: 14; border-bottom: 1px solid #cfc1a8; background: rgba(242,235,222,.97); box-shadow: 0 7px 20px rgba(34,30,24,.12); backdrop-filter: blur(10px); }
+.round-role-tracker > header { min-height: 2.35rem; display: flex; align-items: center; justify-content: space-between; gap: 1rem; padding: .42rem clamp(1rem,3vw,3rem); border-bottom: 1px solid rgba(88,70,43,.12); }
+.round-role-tracker > header > div { display: flex; align-items: center; gap: .45rem; }
+.round-role-tracker > header span { color: #a17838; }
+.round-role-tracker > header strong { font: 900 .8rem "Songti SC", "STSong", Georgia, serif; }
+.round-role-tracker > header small { color: #8a7d68; font-size: .61rem; }
+.round-role-tracker > header b { color: #725d3b; font-size: .62rem; }
+.round-role-scroll { overflow-x: auto; scrollbar-width: thin; scrollbar-color: #b89a68 transparent; }
+.round-role-scroll ol { min-width: 100%; display: flex; list-style: none; padding: 0; margin: 0; }
+.round-role-step { min-width: 8.75rem; min-height: 5.25rem; flex: 1 0 8.75rem; position: relative; display: grid; grid-template-columns: 1.8rem minmax(0,1fr); grid-template-rows: auto auto; gap: .12rem .5rem; align-content: center; padding: .55rem .65rem; border-right: 1px solid rgba(88,70,43,.13); border-top: 3px solid color-mix(in srgb, var(--role-color) 35%, #b9aa90); color: #665e51; background: rgba(255,255,255,.22); }
+.round-role-rank { grid-row: 1 / 3; width: 1.7rem; height: 1.7rem; display: grid; place-items: center; align-self: center; border-radius: 50%; color: #fff !important; background: color-mix(in srgb, var(--role-color) 72%, #777); font: 900 .75rem Georgia, serif; }
+.round-role-step strong { display: block; overflow: hidden; color: var(--ink); font: 900 .76rem "Songti SC", "STSong", Georgia, serif; text-overflow: ellipsis; white-space: nowrap; }
+.round-role-step small { display: block; overflow: hidden; color: #8c816e; font-size: .56rem; text-overflow: ellipsis; white-space: nowrap; }
+.round-role-step > em { grid-column: 2; width: fit-content; color: #80745f; font-size: .55rem; font-style: normal; font-weight: 850; }
+.round-role-step.done { background: rgba(222,235,218,.72); border-top-color: #65816a; }
+.round-role-step.done > em { color: #4f7257; }
+.round-role-step.current { z-index: 1; background: #fff6d7; border-top-color: #c48b2e; box-shadow: inset 0 0 0 2px rgba(196,139,46,.28); }
+.round-role-step.current > em { color: #9a671b; }
+.round-role-step.attacked { background: #f3dfd9; border-top-color: #a84f47; }
+.round-role-step.attacked > em { color: #963f38; }
+.round-role-step.skipped { opacity: .68; background: #e4dfd5; filter: grayscale(.5); }
+.round-role-effects { grid-column: 1 / -1; display: flex; gap: .25rem; min-height: .9rem; margin-top: .18rem; overflow: hidden; }
+.round-role-effects span { border-radius: 999px; padding: .1rem .32rem; font-size: .49rem; font-weight: 850; white-space: nowrap; }
+.round-role-effects .effect-assassin { color: #fff; background: #9d433c; }
+.round-role-effects .effect-robbed { color: #fff; background: #715536; }
+.round-role-effects .effect-bewitched { color: #fff; background: #765990; }
+
 .center-stage { min-height: calc(100vh - 10rem); padding: clamp(3rem, 7vw, 7rem) clamp(1rem, 5vw, 6rem); text-align: center; background: radial-gradient(circle at 50% 20%, #fffdf7, var(--paper) 63%); }
 .center-stage h2 { margin: 0.6rem 0; font-family: "Songti SC", "STSong", Georgia, serif; font-size: clamp(2.2rem, 5vw, 4rem); }
 .center-stage > p { color: var(--ink-soft); margin: 0 auto 2.4rem; max-width: 39rem; line-height: 1.8; }
@@ -425,8 +452,14 @@ button:disabled { cursor: not-allowed; opacity: 0.46; }
 .chronicle-heading { display: flex; align-items: center; gap: .6rem; border-bottom: 1px solid rgba(43,37,28,.15); padding-bottom: .8rem; }
 .chronicle-heading span { color: #a07937; }
 .chronicle h3 { margin: 0; font-family: "Songti SC", "STSong", Georgia, serif; }
+.chronicle-heading small { display: block; margin-top: .15rem; color: #8b7b63; font-size: .57rem; }
 .chronicle ol { list-style: none; padding: 0; margin: 0; }
 .chronicle li { color: #665d50; font-size: .69rem; line-height: 1.55; padding: .7rem .15rem; border-bottom: 1px solid rgba(43,37,28,.08); }
+.round-chronicle { max-height: 32rem; overflow-y: auto; }
+.round-chronicle li:first-child { color: #372f24; font-weight: 750; }
+.full-chronicle { margin-top: .9rem; border-top: 1px solid rgba(43,37,28,.14); }
+.full-chronicle summary { cursor: pointer; padding: .75rem 0; color: #765f3b; font-size: .64rem; font-weight: 850; }
+.full-chronicle ol { max-height: 24rem; overflow-y: auto; }
 
 .modal-backdrop { position: fixed; inset: 0; z-index: 20; display: grid; place-items: center; padding: 1rem; background: rgba(9,15,26,.72); backdrop-filter: blur(6px); }
 .draw-modal { width: min(40rem, 100%); background: var(--paper); padding: clamp(1.5rem, 5vw, 3.5rem); box-shadow: var(--shadow); text-align: center; }
@@ -541,6 +574,9 @@ button:disabled { cursor: not-allowed; opacity: 0.46; }
   .player-strip { scrollbar-width: none; }
   .player-strip::-webkit-scrollbar { display: none; }
   .player-chip { min-width: 200px; }
+  .round-role-tracker > header { align-items: flex-start; }
+  .round-role-step { flex-basis: 8.35rem; min-width: 8.35rem; scroll-snap-align: start; }
+  .round-role-scroll { scroll-snap-type: x proximity; }
   .center-stage { padding: 3rem 1rem; }
   .seated-players, .ruleset-preview { grid-template-columns: repeat(2, 1fr); }
   .role-grid { grid-template-columns: 1fr; }

@@ -77,6 +77,11 @@ test("keeps unrevealed opponent identities private", () => {
   const opponentView = hostView.players.find((player) => player.id === second.id)!;
   assert.ok(opponentView.roleKeys.length <= 1);
   assert.equal(hostView.players.find((player) => player.id === host.id)?.roleKeys.length, 2);
+  assert.match(hostView.roundLog[0], /第 1 轮开始/);
+  assert.ok(hostView.roundLog.some((entry) => entry.includes("秘密选好角色")));
+  assert.equal(hostView.assassinatedRoleKey, null);
+  assert.equal(hostView.robbedRoleKey, null);
+  assert.equal(hostView.bewitchedRoleKey, null);
 });
 
 test("supports gathering resources and building with server-side validation", () => {
