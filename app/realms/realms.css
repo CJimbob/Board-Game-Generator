@@ -275,16 +275,17 @@
 .realm-area.terrain-marsh .region-hit { background: repeating-linear-gradient(12deg, rgba(62, 91, 70, .12) 0 1px, transparent 1px 8px), color-mix(in srgb, var(--owner) 26%, #abb18d); }
 .realm-area.terrain-field .region-hit { background: repeating-linear-gradient(84deg, rgba(121, 96, 48, .08) 0 1px, transparent 1px 9px), color-mix(in srgb, var(--owner) 27%, #d0c292); }
 .realm-area.land .region-hit {
-  background: color-mix(in srgb, var(--owner) 13%, transparent);
-  filter: drop-shadow(0 0 1px rgba(232, 213, 165, .78)) drop-shadow(0 2px 2px rgba(8, 15, 14, .18));
+  background: transparent;
+  filter: drop-shadow(0 0 1px rgba(232, 213, 165, .42));
 }
 .realm-area.sea .region-hit {
-  background: color-mix(in srgb, var(--owner) 7%, transparent);
-  filter: drop-shadow(0 0 1px rgba(143, 191, 194, .48));
+  background: transparent;
+  filter: none;
 }
 .map-relief { display: none; }
-.realm-area .region-hit:hover { filter: brightness(1.09) saturate(1.12) drop-shadow(0 0 2px #f3d887) drop-shadow(0 7px 9px rgba(3, 18, 21, .24)); }
-.realm-area.selected .region-hit { filter: brightness(1.08) saturate(1.16) drop-shadow(0 0 3px #f3d887) drop-shadow(0 0 8px rgba(235, 201, 113, .8)); }
+.realm-area.selectable .region-hit { background: transparent; filter: drop-shadow(0 0 1px rgba(247, 222, 153, .68)); }
+.realm-area .region-hit:hover { background: transparent; filter: drop-shadow(0 0 2px #f3d887); }
+.realm-area.selected .region-hit { background: transparent; filter: drop-shadow(0 0 2px #f3d887) drop-shadow(0 0 5px rgba(235, 201, 113, .38)); }
 .area-content {
   position: absolute;
   z-index: 8;
@@ -293,14 +294,19 @@
   display: grid;
   justify-items: start;
   transform: translate(-50%, -50%);
-  pointer-events: none;
+  pointer-events: auto;
+  cursor: pointer;
   text-align: left;
   text-shadow: 0 1px rgba(255, 250, 230, .55);
+  transition: transform .14s ease, filter .14s ease;
 }
 .realm-area.sea .area-content { opacity: .8; text-shadow: 0 1px 2px #0a252d; }
-.area-content strong { display: block; max-width: 6.4rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; padding: .12rem .25rem; color: #171d19; background: rgba(236, 224, 193, .82); border: 1px solid rgba(78, 64, 41, .25); box-shadow: 0 2px 5px rgba(11, 22, 20, .18); font: 900 .58rem "Songti SC", STSong, Georgia, serif; letter-spacing: .03em; }
+.area-content strong { display: block; max-width: 7.5rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; padding: .19rem .38rem; color: #171d19; background: rgba(241, 231, 205, .92); border: 1px solid rgba(64, 52, 35, .48); border-left: 3px solid var(--owner); box-shadow: 0 3px 8px rgba(5, 18, 17, .34); font: 900 .67rem "Songti SC", STSong, Georgia, serif; letter-spacing: .03em; }
 .realm-area.sea .area-content strong { font: italic 800 .6rem Georgia, "Songti SC", serif; letter-spacing: .08em; }
 .realm-area.sea .area-content strong { color: #dcece8; background: rgba(8, 38, 45, .68); border-color: rgba(160, 199, 196, .25); }
+.realm-area.selectable .area-content strong { border-color: #e7c86f; box-shadow: 0 0 0 2px rgba(232, 200, 111, .24), 0 4px 10px rgba(5, 18, 17, .4); }
+.realm-area.selected .area-content { z-index: 18; transform: translate(-50%, -50%) scale(1.12); filter: drop-shadow(0 0 6px rgba(246, 211, 119, .8)); }
+.realm-area.selected .area-content strong::before { content: "● "; color: #a67924; }
 .area-icons { display: flex; gap: .22rem; min-height: .7rem; margin-top: .08rem; font-size: .5rem; }
 .area-icons i { font-style: normal; }
 .area-icons .neutral { color: #9b2429; font-weight: 900; }
@@ -401,6 +407,10 @@
 .planning-progress > div > span > b { color: #9ead9f; font-size: .43rem; }
 .planning-progress > div > span.locked { background: rgba(184, 151, 75, .13); border-color: rgba(222, 190, 113, .3); }
 .planning-progress > div > span.locked > b { color: #dfc47f; }
+.planning-selection { display: grid; grid-template-columns: 1fr auto; gap: .15rem .6rem; padding: .65rem .75rem; color: #f1ead9; background: #25393b; border-left: 4px solid #c4a154; }
+.planning-selection small { grid-column: 1 / -1; color: #aebbb5; font-size: .48rem; letter-spacing: .1em; text-transform: uppercase; }
+.planning-selection strong { font: 900 .86rem "Songti SC", STSong, Georgia, serif; }
+.planning-selection span { align-self: center; color: #dfc77f; font-size: .55rem; font-weight: 800; }
 .planning-wait { padding-top: 1rem; }
 .planning-wait .planning-progress { width: calc(100% + 2rem); place-items: stretch; text-align: left; }
 @keyframes realm-planning-pulse { 70% { box-shadow: 0 0 0 .45rem rgba(226, 193, 109, 0); } 100% { box-shadow: 0 0 0 0 rgba(226, 193, 109, 0); } }
@@ -454,10 +464,13 @@
 .realm-modal article > section h3 { margin: 0 0 .3rem; font: 900 .9rem "Songti SC", STSong, Georgia, serif; }
 .realm-modal article > section p { margin: 0; color: #655f54; font-size: .69rem; line-height: 1.65; }
 
-@media (max-width: 1120px) {
-  .realm-main-grid { grid-template-columns: 1fr; }
-  .realm-command { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); }
-  .action-card { grid-column: 1 / -1; }
+@media (min-width: 821px) and (max-width: 1120px) {
+  .realm-main-grid { grid-template-columns: minmax(0, 1fr) 19rem; gap: .65rem; padding: .65rem; }
+  .realm-map { min-width: 42rem; }
+  .realm-command { position: sticky; top: .5rem; max-height: calc(100vh - 1rem); overflow: auto; }
+  .planning-progress header { align-items: flex-start; }
+  .planning-progress header span { white-space: nowrap; }
+  .order-grid { grid-template-columns: 1fr; }
 }
 
 @media (max-width: 820px) {
@@ -467,7 +480,8 @@
   .realm-entry { margin-top: 0; }
   .realm-phase { grid-template-columns: 1fr auto; }
   .realm-phase p { grid-column: 1 / -1; grid-row: 2; }
-  .realm-main-grid { min-width: 0; padding: .55rem; }
+  .realm-main-grid { min-width: 0; grid-template-columns: 1fr; padding: .55rem; }
+  .realm-map { min-width: 52rem; }
   .realm-command { display: flex; }
 }
 
@@ -480,7 +494,7 @@
   .realm-header > div:first-child { display: grid; }
   .realm-phase { grid-template-columns: 1fr auto; padding: .65rem .75rem; }
   .realm-players { grid-template-columns: repeat(6, 9.5rem); }
-  .realm-map { min-width: 58rem; }
+  .realm-map { min-width: 48rem; }
   .choice-grid, .order-grid { grid-template-columns: 1fr; }
   .raven-replace { grid-template-columns: 1fr; }
 }

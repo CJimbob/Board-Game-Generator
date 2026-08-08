@@ -190,14 +190,17 @@ export function RealmsClient() {
 function RealmTable({ game, session, language, act, busy, error, onRules, onLanguage, rulesOpen, closeRules }: { game: Game; session: Session; language: Language; act: (action: string, payload?: Record<string, unknown>) => void; busy: boolean; error: string; onRules: () => void; onLanguage: () => void; rulesOpen: boolean; closeRules: () => void }) {
   const text = (zh: string, en: string) => language === "zh" ? zh : en;
   const me = game.players.find((player) => player.id === game.viewerId)!;
+  const ownAreas = ownUnitAreas(game, me.faction);
+  const [selectedAreaId, setSelectedAreaId] = useState(ownAreas[0]?.key ?? "throne_city");
   const faction = game.factions.find((item) => item.key === me.faction);
   const current = game.players.find((player) => player.id === game.currentPlayerId);
   const host = game.players.find((player) => player.id === game.hostId);
+  const selectableAreaIds = game.phase === "planning" ? ownAreas.map((area) => area.key) : [];
   return <main className="realm-table" style={{ "--my-faction": faction?.color ?? "#b69655" } as CSSProperties}>
     <header className="realm-header"><div><Link href="/realms" className="realm-brand">✦ {text("六境争霸", "The Six Realms")}</Link><span>{text(`房间 ${game.code}`, `Room ${game.code}`)}</span><span>{text(`第 ${game.round}/10 轮`, `Round ${game.round}/10`)}</span></div><div>{game.viewerId !== game.hostId && host && !host.isBot && !host.isOnline && <button onClick={() => act("claimHost")}>{text("接任房主", "Take host")}</button>}<button onClick={() => navigator.clipboard.writeText(`${window.location.origin}/realms?room=${game.code}`)}>{text("复制邀请", "Copy invite")}</button>{session.recoveryCode && <button onClick={() => navigator.clipboard.writeText(session.recoveryCode!)}>{text(`恢复码 ${session.recoveryCode}`, `Recovery ${session.recoveryCode}`)}</button>}<button onClick={onLanguage}>{language === "zh" ? "EN" : "中文"}</button><button onClick={onRules}>{text("规则书", "Rules")}</button></div></header>
     <section className="realm-phase"><div><small>{text("当前阶段", "Current phase")}</small><strong>{(PHASE_LABELS[game.phase] ?? [game.phase, game.phase])[language === "zh" ? 0 : 1]}</strong></div><p>{current ? text(`等待 ${current.name} 决定`, `Waiting for ${current.name}`) : game.phase === "planning" ? text("所有势力同时秘密下令", "All factions assign orders simultaneously") : text("服务器正在结算", "Resolving on the server")}</p><div className="wildling-meter"><span>{text("荒境威胁", "Frontier threat")}</span><b>{game.wildlingThreat}/12</b></div></section>
     <PlayerRibbon game={game} language={language} act={act} />
-    <div className="realm-main-grid"><section className="realm-map-wrap"><RealmMap game={game} language={language} /></section><aside className="realm-command"><InfluenceTracks game={game} language={language} /><ActionPanel game={game} me={me} language={language} act={act} busy={busy} />{error && <p className="realm-error">{error}</p>}<Chronicle game={game} language={language} /></aside></div>
+    <div className="realm-main-grid"><section className="realm-map-wrap"><RealmMap game={game} language={language} selectedKey={selectedAreaId} onSelect={setSelectedAreaId} selectableAreaIds={selectableAreaIds} /></section><aside className="realm-command"><ActionPanel game={game} me={me} language={language} act={act} busy={busy} selectedAreaId={selectedAreaId} onSelectArea={setSelectedAreaId} /><InfluenceTracks game={game} language={language} />{error && <p className="realm-error">{error}</p>}<Chronicle game={game} language={language} /></aside></div>
     {rulesOpen && <RulesModal language={language} onClose={closeRules} />}
   </main>;
 }
@@ -248,19 +251,20 @@ const AREA_TERRAIN: Record<string, string> = {
   red_desert: "desert", red_steppe: "desert", salt_marsh: "marsh", sunfield: "field",
 };
 
-function RealmMap({ game, language }: { game: Game; language: Language }) {
+function RealmMap({ game, language, selectedKey, onSelect, selectableAreaIds }: { game: Game; language: Language; selectedKey: string; onSelect: (areaId: string) => void; selectableAreaIds: string[] }) {
   const factionMap = new Map(game.factions.map((faction) => [faction.key, faction]));
-  const [selectedKey, setSelectedKey] = useState("throne_city");
+  const chooseArea = (areaId: string) => { if (!selectableAreaIds.length || selectableAreaIds.includes(areaId)) onSelect(areaId); };
   const selectedDefinition = game.areaDefinitions.find((area) => area.key === selectedKey) ?? game.areaDefinitions[0];
   const selectedState = selectedDefinition ? game.areas[selectedDefinition.key] : null;
   const selectedOwnerKey = selectedState?.units[0]?.faction ?? selectedState?.control;
   const selectedOwner = selectedOwnerKey ? factionMap.get(selectedOwnerKey) : null;
   const kindLabel = selectedDefinition?.kind === "sea" ? (language === "zh" ? "海域" : "Sea") : selectedDefinition?.kind === "port" ? (language === "zh" ? "港口" : "Port") : (language === "zh" ? "陆地" : "Land");
 
-  const renderContents = (definition: AreaDefinition) => {
+  const renderContents = (definition: AreaDefinition, inPort = false) => {
     const state = game.areas[definition.key];
     const units = state.units;
-    return <span className="area-content" style={{ left: `${definition.x}%`, top: `${definition.y}%` }}>
+    const selectable = !selectableAreaIds.length || selectableAreaIds.includes(definition.key);
+    return <span className="area-content" style={{ left: `${definition.x}%`, top: `${definition.y}%` }} role={inPort || !selectable ? undefined : "button"} tabIndex={inPort || !selectable ? undefined : 0} onClick={inPort || !selectable ? undefined : (event) => { event.stopPropagation(); chooseArea(definition.key); }} onKeyDown={inPort || !selectable ? undefined : (event) => { if (event.key === "Enter" || event.key === " ") { event.preventDefault(); chooseArea(definition.key); } }}>
       <strong>{language === "zh" ? definition.name : definition.nameEn}</strong>
       <span className="area-icons">{definition.castle && <i>♜{definition.castle}</i>}{definition.supply && <i>▰{definition.supply}</i>}{definition.power && <i>◆{definition.power}</i>}{state.neutral && <i className="neutral">⚔{state.neutral >= 99 ? "∞" : state.neutral}</i>}{state.garrison && <i className="garrison">▣{state.garrison}</i>}</span>
       {units.length > 0 && <span className="area-units">{units.map((unit) => <i key={unit.id} className={unit.routed ? "routed" : ""} style={{ background: factionMap.get(unit.faction)?.color }}>{UNIT_LABELS[unit.type][0]}</i>)}</span>}
@@ -272,14 +276,14 @@ function RealmMap({ game, language }: { game: Game; language: Language }) {
   const ports = game.areaDefinitions.filter((definition) => definition.kind === "port");
   return <div className="realm-map" aria-label={language === "zh" ? "六境战争版图" : "Map of the Six Realms"}>
     <div className="map-compass" aria-hidden="true">✦<small>N</small></div>
-    <div className="map-legend"><b>{language === "zh" ? "版图标记" : "Map key"}</b><span>♜ {language === "zh" ? "城堡" : "Castle"}</span><span>▰ {language === "zh" ? "补给" : "Supply"}</span><span>◆ {language === "zh" ? "威望" : "Power"}</span></div>
+    <div className="map-legend"><b>{language === "zh" ? "点击区域名称选择" : "Select by clicking a name"}</b><span>♜ {language === "zh" ? "城堡" : "Castle"}</span><span>▰ {language === "zh" ? "补给" : "Supply"}</span><span>◆ {language === "zh" ? "威望" : "Power"}</span></div>
     <div className="map-relief" aria-hidden="true"><span className="ridge ridge-north">▲ ▲ ▲ ▲</span><span className="ridge ridge-east">▲ ▲ ▲</span><span className="forest-mark">♠ ♠ ♠</span><span className="river-mark river-one" /><span className="river-mark river-two" /></div>
     {regions.map((definition) => {
       const state = game.areas[definition.key];
       const owner = state.units[0]?.faction ?? state.control;
       const faction = owner ? factionMap.get(owner) : null;
-      return <article key={definition.key} className={`realm-area ${definition.kind} terrain-${AREA_TERRAIN[definition.key] ?? "plain"} ${state.order ? "has-order" : ""} ${selectedKey === definition.key ? "selected" : ""}`} style={{ "--owner": faction?.color ?? (definition.kind === "sea" ? "#3d7380" : "#9a8d70") } as CSSProperties}>
-        <button className="region-hit" style={{ clipPath: `polygon(${REGION_PATHS[definition.key]})` }} onClick={() => setSelectedKey(definition.key)} aria-label={language === "zh" ? definition.name : definition.nameEn} title={language === "zh" ? definition.name : definition.nameEn} />
+      return <article key={definition.key} className={`realm-area ${definition.kind} terrain-${AREA_TERRAIN[definition.key] ?? "plain"} ${state.order ? "has-order" : ""} ${selectableAreaIds.includes(definition.key) ? "selectable" : ""} ${selectedKey === definition.key ? "selected" : ""}`} style={{ "--owner": faction?.color ?? (definition.kind === "sea" ? "#3d7380" : "#9a8d70") } as CSSProperties}>
+        <button className="region-hit" style={{ clipPath: `polygon(${REGION_PATHS[definition.key]})` }} onClick={() => chooseArea(definition.key)} disabled={Boolean(selectableAreaIds.length && !selectableAreaIds.includes(definition.key))} aria-label={language === "zh" ? definition.name : definition.nameEn} title={language === "zh" ? definition.name : definition.nameEn} />
         {renderContents(definition)}
       </article>;
     })}
@@ -287,7 +291,7 @@ function RealmMap({ game, language }: { game: Game; language: Language }) {
       const state = game.areas[definition.key];
       const owner = state.units[0]?.faction ?? state.control;
       const faction = owner ? factionMap.get(owner) : null;
-      return <button key={definition.key} className={`realm-port ${selectedKey === definition.key ? "selected" : ""}`} style={{ left: `${definition.x}%`, top: `${definition.y}%`, "--owner": faction?.color ?? "#806c4e" } as CSSProperties} onClick={() => setSelectedKey(definition.key)}>{renderContents(definition)}</button>;
+      return <button key={definition.key} className={`realm-port ${selectableAreaIds.includes(definition.key) ? "selectable" : ""} ${selectedKey === definition.key ? "selected" : ""}`} style={{ left: `${definition.x}%`, top: `${definition.y}%`, "--owner": faction?.color ?? "#806c4e" } as CSSProperties} onClick={() => chooseArea(definition.key)} disabled={Boolean(selectableAreaIds.length && !selectableAreaIds.includes(definition.key))}>{renderContents(definition, true)}</button>;
     })}
     {selectedDefinition && selectedState && <aside className="map-inspector" style={{ "--owner": selectedOwner?.color ?? "#9a8d70" } as CSSProperties}>
       <span>{kindLabel} · {selectedOwner ? (language === "zh" ? selectedOwner.name : selectedOwner.nameEn) : (language === "zh" ? "未控制" : "Uncontrolled")}</span>
@@ -302,11 +306,11 @@ function InfluenceTracks({ game, language }: { game: Game; language: Language })
   return <section className="influence-card"><h3>{language === "zh" ? "三条影响力轨道" : "Influence tracks"}</h3>{(["throne", "fiefdom", "court"] as const).map((track) => <div key={track}><strong>{names[track]}</strong><ol>{game.influence[track].map((factionKey, index) => { const faction = game.factions.find((item) => item.key === factionKey)!; return <li key={factionKey} style={{ "--faction": faction.color } as CSSProperties}><i />{index + 1}. {language === "zh" ? faction.name : faction.nameEn}</li>; })}</ol></div>)}</section>;
 }
 
-function ActionPanel({ game, me, language, act, busy }: { game: Game; me: Player; language: Language; act: (action: string, payload?: Record<string, unknown>) => void; busy: boolean }) {
+function ActionPanel({ game, me, language, act, busy, selectedAreaId, onSelectArea }: { game: Game; me: Player; language: Language; act: (action: string, payload?: Record<string, unknown>) => void; busy: boolean; selectedAreaId: string; onSelectArea: (areaId: string) => void }) {
   const text = (zh: string, en: string) => language === "zh" ? zh : en;
   if (game.phase === "lobby") return <LobbyPanel game={game} me={me} language={language} act={act} />;
   if (game.phase === "finished") { const winner = game.players.find((player) => player.id === game.winnerId); return <section className="action-card victory"><span>♛</span><h2>{text(`${winner?.name} 统一六境`, `${winner?.name} unites the realms`)}</h2><p>{text("依次比较城堡、补给、威望与王座顺位。", "Ties are resolved by castles, supply, power, then Throne position.")}</p></section>; }
-  if (game.phase === "planning") return <PlanningPanel game={game} me={me} language={language} act={act} />;
+  if (game.phase === "planning") return <PlanningPanel game={game} me={me} language={language} act={act} selectedAreaId={selectedAreaId} onSelectArea={onSelectArea} />;
   if (game.phase === "raven" && game.currentPlayerId === me.id) return <RavenPanel game={game} language={language} act={act} />;
   if (game.phase === "influence_bid" || game.phase === "wildling_bid") return <BidPanel game={game} me={me} language={language} act={act} />;
   if (game.phase === "bid_tiebreak" && game.currentPlayerId === me.id) return <TieBreakPanel game={game} language={language} act={act} />;
@@ -334,11 +338,11 @@ function ownUnitAreas(game: Game, faction: string | null) { return game.areaDefi
 function areaName(game: Game, id: string, language: Language) { const area = game.areaDefinitions.find((item) => item.key === id); return area ? language === "zh" ? area.name : area.nameEn : id; }
 function factionName(game: Game, id: string, language: Language) { const faction = game.factions.find((item) => item.key === id); return faction ? language === "zh" ? faction.name : faction.nameEn : id; }
 
-function PlanningPanel({ game, me, language, act }: { game: Game; me: Player; language: Language; act: (action: string, payload?: Record<string, unknown>) => void }) {
+function PlanningPanel({ game, me, language, act, selectedAreaId, onSelectArea }: { game: Game; me: Player; language: Language; act: (action: string, payload?: Record<string, unknown>) => void; selectedAreaId: string; onSelectArea: (areaId: string) => void }) {
   const text = (zh: string, en: string) => language === "zh" ? zh : en;
   const areas = ownUnitAreas(game, me.faction);
   const [orders, setOrders] = useState<Record<string, Order>>({});
-  const [selected, setSelected] = useState(areas[0]?.key ?? "");
+  const selected = areas.some((area) => area.key === selectedAreaId) ? selectedAreaId : areas[0]?.key ?? "";
   const starLimit = (game.players.length <= 4 ? [3,2,1,0] : [3,3,2,1,0,0])[Math.max(0, game.influence.court.indexOf(me.faction ?? ""))] ?? 0;
   const forbidden = (order: Order) => game.forbiddenOrderFamily === "march_star" ? order === "march_star" : game.forbiddenOrderFamily && order.startsWith(game.forbiddenOrderFamily);
   const allowedOrders = (Object.keys(game.orderCounts) as Order[]).filter((order) => !forbidden(order));
@@ -348,7 +352,7 @@ function PlanningPanel({ game, me, language, act }: { game: Game; me: Player; la
   const usedCounts = Object.values(orders).reduce<Record<string, number>>((counts, order) => ({ ...counts, [order]: (counts[order] ?? 0) + 1 }), {});
   const progress = <div className="planning-progress"><header><div><i /> <strong>{text("所有势力正在同时规划", "All factions are planning simultaneously")}</strong></div><span>{game.players.filter((player) => player.submitted).length}/{game.players.length} {text("已封存", "locked")}</span></header><p>{text("此阶段没有轮到谁；每位玩家都能同时操作，最后一人封存后命令一起翻开。电脑势力会立即完成规划。", "There is no active player in this phase. Everyone acts at once; all orders reveal when the final faction locks. AI factions plan immediately.")}</p><div>{game.players.map((player) => { const faction = game.factions.find((item) => item.key === player.faction); return <span key={player.id} className={player.submitted ? "locked" : "planning"} style={{ "--faction": faction?.color ?? "#777" } as CSSProperties}><i />{player.name}<b>{player.submitted ? text("已封存", "Locked") : text("规划中", "Planning")}</b></span>; })}</div></div>;
   if (me.submitted) return <section className="action-card waiting planning-wait">{progress}<span>✓</span><h3>{text("你的命令已秘密封存", "Your orders are locked in secret")}</h3><p>{text("其他玩家只能看见你已经完成，无法看到命令内容。", "Others can only see that you are ready, never the orders themselves.")}</p></section>;
-  return <section className="action-card planning-card">{progress}<h3>{text("同时秘密下令 · 选择你的区域", "Simultaneous secret planning · choose your areas")}</h3><p>{text(`王庭允许 ${starLimit} 枚星级命令；本轮须放置 ${required} 枚。`, `Court position allows ${starLimit} starred orders; place ${required} orders this round.`)}</p><div className="order-area-tabs">{areas.map((area) => <button key={area.key} className={selected === area.key ? "selected" : ""} onClick={() => setSelected(area.key)}>{areaName(game, area.key, language)}{orders[area.key] ? ` · ${ORDER_LABELS[orders[area.key]][language === "zh" ? 0 : 1]}` : ""}</button>)}</div><div className="order-grid">{(Object.keys(game.orderCounts) as Order[]).map((order) => { const disabled = Boolean(forbidden(order)) || (usedCounts[order] ?? 0) >= game.orderCounts[order] && orders[selected] !== order || order.endsWith("_star") && Object.values(orders).filter((item) => item.endsWith("_star")).length >= starLimit && orders[selected] !== order; return <button key={order} className={orders[selected] === order ? "selected" : ""} disabled={disabled} onClick={() => setOrders((current) => { const next = { ...current }; if (!next[selected] && Object.keys(next).length >= required) delete next[Object.keys(next)[0]]; next[selected] = order; return next; })}>{ORDER_LABELS[order][language === "zh" ? 0 : 1]} <small>{usedCounts[order] ?? 0}/{game.orderCounts[order]}</small></button>; })}</div><button className="realm-primary" disabled={Object.keys(orders).length !== required} onClick={() => act("submitOrders", { orders })}>{text("秘密封存并等待其他玩家", "Lock secretly and wait for everyone")}</button></section>;
+  return <section className="action-card planning-card">{progress}<h3>{text("同时秘密下令", "Simultaneous secret planning")}</h3><p>{text(`王庭允许 ${starLimit} 枚星级命令；本轮须放置 ${required} 枚。点击地图上的己方区域名称也能切换。`, `Court position allows ${starLimit} starred orders; place ${required} orders. You can switch areas by clicking their names on the map.`)}</p><div className="planning-selection"><small>{text("当前选择", "Selected area")}</small><strong>{areaName(game, selected, language)}</strong><span>{orders[selected] ? ORDER_LABELS[orders[selected]][language === "zh" ? 0 : 1] : text("尚未下令", "No order yet")}</span></div><div className="order-area-tabs">{areas.map((area) => <button key={area.key} className={selected === area.key ? "selected" : ""} onClick={() => onSelectArea(area.key)}>{areaName(game, area.key, language)}{orders[area.key] ? ` · ${ORDER_LABELS[orders[area.key]][language === "zh" ? 0 : 1]}` : ""}</button>)}</div><div className="order-grid">{(Object.keys(game.orderCounts) as Order[]).map((order) => { const disabled = Boolean(forbidden(order)) || (usedCounts[order] ?? 0) >= game.orderCounts[order] && orders[selected] !== order || order.endsWith("_star") && Object.values(orders).filter((item) => item.endsWith("_star")).length >= starLimit && orders[selected] !== order; return <button key={order} className={orders[selected] === order ? "selected" : ""} disabled={disabled} onClick={() => setOrders((current) => { const next = { ...current }; if (!next[selected] && Object.keys(next).length >= required) delete next[Object.keys(next)[0]]; next[selected] = order; return next; })}>{ORDER_LABELS[order][language === "zh" ? 0 : 1]} <small>{usedCounts[order] ?? 0}/{game.orderCounts[order]}</small></button>; })}</div><button className="realm-primary" disabled={Object.keys(orders).length !== required} onClick={() => act("submitOrders", { orders })}>{text("秘密封存并等待其他玩家", "Lock secretly and wait for everyone")}</button></section>;
 }
 
 function RavenPanel({ game, language, act }: { game: Game; language: Language; act: (action: string, payload?: Record<string, unknown>) => void }) {
