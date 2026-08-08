@@ -267,6 +267,7 @@ function RealmMap({ game, language, inspectedKey, actionKey, onInspect, selectab
   const suppressClick = useRef(false);
   const initialFocusDone = useRef(false);
   const [zoom, setZoom] = useState(1);
+  const [fitSize, setFitSize] = useState({ width: 0, height: 0 });
   const [dragging, setDragging] = useState(false);
   const [showAllLabels, setShowAllLabels] = useState(false);
   const [expanded, setExpanded] = useState(false);
@@ -306,12 +307,17 @@ function RealmMap({ game, language, inspectedKey, actionKey, onInspect, selectab
     const oldHeight = viewport?.scrollHeight ?? 1;
     const centerX = viewport ? (viewport.scrollLeft + viewport.clientWidth / 2) / oldWidth : .5;
     const centerY = viewport ? (viewport.scrollTop + viewport.clientHeight / 2) / oldHeight : .5;
-    const next = Math.max(1, Math.min(1.8, Math.round(nextValue * 10) / 10));
+    const next = Math.max(1, Math.min(2.4, Math.round(nextValue * 10) / 10));
     setZoom(next);
     requestAnimationFrame(() => {
       if (!viewport) return;
       viewport.scrollTo({ left: centerX * viewport.scrollWidth - viewport.clientWidth / 2, top: centerY * viewport.scrollHeight - viewport.clientHeight / 2 });
     });
+  };
+
+  const showWholeMap = () => {
+    setZoom(1);
+    requestAnimationFrame(() => viewportRef.current?.scrollTo({ left: 0, top: 0, behavior: "smooth" }));
   };
 
   const beginPan = (event: ReactPointerEvent<HTMLDivElement>) => {
@@ -354,6 +360,21 @@ function RealmMap({ game, language, inspectedKey, actionKey, onInspect, selectab
   };
 
   useEffect(() => {
+    const viewport = viewportRef.current;
+    if (!viewport) return;
+    const measure = () => {
+      const usableWidth = Math.max(1, viewport.clientWidth - 16);
+      const usableHeight = Math.max(1, viewport.clientHeight - 16);
+      const width = Math.min(usableWidth, usableHeight * 2 / 3);
+      setFitSize({ width, height: width * 3 / 2 });
+    };
+    measure();
+    const observer = new ResizeObserver(measure);
+    observer.observe(viewport);
+    return () => observer.disconnect();
+  }, []);
+
+  useEffect(() => {
     if (initialFocusDone.current || !inspectedKey) return;
     initialFocusDone.current = true;
     const frame = requestAnimationFrame(() => focusArea(inspectedKey, "auto"));
@@ -380,17 +401,18 @@ function RealmMap({ game, language, inspectedKey, actionKey, onInspect, selectab
 
   return <div className={`realm-map-shell ${expanded ? "expanded" : ""} ${showAllLabels ? "show-all-labels" : "compact-labels"}`}>
     <header className="map-toolbar">
-      <div className="map-toolbar-copy"><strong>{language === "zh" ? "战争地图" : "War map"}</strong><span>{language === "zh" ? "拖动地图 · 滚轮浏览 · ⌘/Ctrl + 滚轮缩放" : "Drag to pan · scroll to browse · ⌘/Ctrl + wheel to zoom"}</span></div>
+      <div className="map-toolbar-copy"><strong>{language === "zh" ? "战争地图" : "War map"}</strong><span>{language === "zh" ? "默认显示全图 · 放大后拖动 · ⌘/Ctrl + 滚轮缩放" : "Full map by default · drag after zooming · ⌘/Ctrl + wheel to zoom"}</span></div>
       <label className="map-area-picker"><span>{language === "zh" ? "快速定位" : "Find area"}</span><select value={selectedDefinition?.key ?? ""} onChange={(event) => chooseArea(event.target.value, true)}>{navigableAreas.map((area) => <option key={area.key} value={area.key}>{language === "zh" ? area.name : area.nameEn}</option>)}</select></label>
       <div className="map-tools" aria-label={language === "zh" ? "地图工具" : "Map tools"}>
-        <button onClick={() => changeZoom(zoom - .1)} disabled={zoom <= 1} aria-label={language === "zh" ? "缩小地图" : "Zoom out"}>−</button><output>{Math.round(zoom * 100)}%</output><button onClick={() => changeZoom(zoom + .1)} disabled={zoom >= 1.8} aria-label={language === "zh" ? "放大地图" : "Zoom in"}>＋</button>
+        <button className={zoom === 1 ? "active" : ""} onClick={showWholeMap}>{language === "zh" ? "全图" : "Fit"}</button>
+        <button onClick={() => changeZoom(zoom - .1)} disabled={zoom <= 1} aria-label={language === "zh" ? "缩小地图" : "Zoom out"}>−</button><output>{Math.round(zoom * 100)}%</output><button onClick={() => changeZoom(zoom + .1)} disabled={zoom >= 2.4} aria-label={language === "zh" ? "放大地图" : "Zoom in"}>＋</button>
         <button onClick={() => focusArea(selectedDefinition.key)}>{language === "zh" ? "定位" : "Focus"}</button>
         <button className={showAllLabels ? "active" : ""} onClick={() => setShowAllLabels((value) => !value)}>{showAllLabels ? (language === "zh" ? "精简地名" : "Fewer labels") : (language === "zh" ? "全部地名" : "All labels")}</button>
         <button onClick={() => { setExpanded((value) => !value); requestAnimationFrame(() => focusArea(selectedDefinition.key, "auto")); }}>{expanded ? (language === "zh" ? "退出全屏" : "Exit full map") : (language === "zh" ? "全屏地图" : "Full map")}</button>
       </div>
     </header>
     <div ref={viewportRef} className={`realm-map-viewport ${dragging ? "dragging" : ""}`} onPointerDown={beginPan} onPointerMove={panMap} onPointerUp={endPan} onPointerCancel={endPan} onWheel={wheelZoom}>
-      <div ref={mapRef} className="realm-map" style={{ width: `${zoom * 100}%` }} aria-label={language === "zh" ? "六境战争版图" : "Map of the Six Realms"}>
+      <div ref={mapRef} className="realm-map" style={fitSize.width ? { width: `${fitSize.width * zoom}px`, height: `${fitSize.height * zoom}px` } : undefined} aria-label={language === "zh" ? "六境战争版图" : "Map of the Six Realms"}>
         <div className="map-compass" aria-hidden="true">✦<small>N</small></div>
         <svg className="realm-region-overlay" viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true">{regions.map((definition) => {
       const state = game.areas[definition.key];

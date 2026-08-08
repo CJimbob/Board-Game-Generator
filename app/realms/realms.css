@@ -206,7 +206,9 @@
 .realm-map-viewport {
   position: relative;
   height: clamp(34rem, 72vh, 49rem);
+  box-sizing: border-box;
   overflow: auto;
+  padding: .5rem;
   overscroll-behavior: contain;
   touch-action: none;
   cursor: grab;
@@ -217,7 +219,9 @@
 .realm-map-viewport.dragging { cursor: grabbing; user-select: none; }
 .realm-map {
   position: relative;
-  min-width: 42rem;
+  width: min(100%, 32rem);
+  min-width: 0;
+  margin: 0 auto;
   aspect-ratio: 2 / 3;
   flex: none;
   overflow: hidden;
@@ -262,12 +266,12 @@
 .map-compass { position: absolute; z-index: 20; right: 19%; top: 2rem; color: rgba(235, 211, 151, .64); font: 3.8rem/1 Georgia, serif; text-shadow: 0 2px 10px #0d2830; }
 .map-compass small { position: absolute; left: 50%; top: -1rem; font-size: .58rem; transform: translateX(-50%); }
 .realm-region-overlay { position: absolute; z-index: 2; inset: 0; width: 100%; height: 100%; pointer-events: none; }
-.realm-region-overlay polygon { fill: var(--region-owner); fill-opacity: .035; stroke: rgba(255, 246, 216, .62); stroke-width: .12; vector-effect: non-scaling-stroke; transition: fill-opacity .15s ease, stroke-width .15s ease; }
-.realm-region-overlay polygon.sea { fill-opacity: .018; stroke: rgba(224, 232, 216, .42); stroke-width: .13; }
-.realm-region-overlay polygon.blocked { fill: rgba(56, 34, 31, .72); fill-opacity: .58; stroke: rgba(198, 105, 83, .8); stroke-dasharray: .7 .55; }
-.realm-region-overlay polygon.actionable { fill: #f0cb68; fill-opacity: .13; stroke: #e9ca76; stroke-width: .2; stroke-dasharray: .55 .32; }
-.realm-region-overlay polygon.action-selected { fill: #f0cb68; fill-opacity: .21; stroke: #ffe4a0; stroke-width: .28; }
-.realm-region-overlay polygon.inspected { fill-opacity: .22; stroke: #fff1b7; stroke-width: .34; }
+.realm-region-overlay polygon { fill: var(--region-owner); fill-opacity: .035; stroke: rgba(255, 247, 220, .94); stroke-width: 1.15; stroke-linejoin: round; vector-effect: non-scaling-stroke; filter: drop-shadow(0 1px 0 rgba(50, 39, 26, .72)); transition: fill-opacity .15s ease, stroke-width .15s ease; }
+.realm-region-overlay polygon.sea { fill-opacity: .018; stroke: rgba(222, 235, 224, .78); stroke-width: .9; stroke-dasharray: 4 2; }
+.realm-region-overlay polygon.blocked { fill: rgba(56, 34, 31, .72); fill-opacity: .58; stroke: rgba(215, 112, 87, .94); stroke-width: 1.4; stroke-dasharray: 6 4; }
+.realm-region-overlay polygon.actionable { fill: #f0cb68; fill-opacity: .13; stroke: #f0cc69; stroke-width: 1.8; stroke-dasharray: 6 3; }
+.realm-region-overlay polygon.action-selected { fill: #f0cb68; fill-opacity: .21; stroke: #ffe8a8; stroke-width: 2.5; stroke-dasharray: none; }
+.realm-region-overlay polygon.inspected { fill-opacity: .22; stroke: #fff7d5; stroke-width: 3; stroke-dasharray: none; filter: drop-shadow(0 0 3px rgba(255, 220, 124, .88)) drop-shadow(0 1px 0 rgba(50, 39, 26, .8)); }
 .map-relief { position: absolute; z-index: 5; inset: 0; pointer-events: none; color: rgba(74, 61, 40, .3); }
 .map-relief .ridge { position: absolute; font: 900 .9rem/1 Georgia, serif; letter-spacing: -.12em; transform: rotate(-16deg); }
 .ridge-north { left: 16%; top: 17%; }
@@ -566,7 +570,7 @@
 
 @media (min-width: 821px) and (max-width: 1120px) {
   .realm-main-grid { grid-template-columns: minmax(0, 1fr) 19rem; gap: .65rem; padding: .65rem; }
-  .realm-map { min-width: 42rem; }
+  .realm-map { min-width: 0; }
   .map-toolbar { grid-template-columns: 1fr minmax(9rem, 13rem); }
   .map-tools { grid-column: 1 / -1; }
   .map-selection-dock { grid-template-columns: 1fr 1fr; }
@@ -586,7 +590,7 @@
   .realm-phase { grid-template-columns: 1fr auto; }
   .realm-phase p { grid-column: 1 / -1; grid-row: 2; }
   .realm-main-grid { min-width: 0; grid-template-columns: 1fr; padding: .55rem; }
-  .realm-map { min-width: 40rem; }
+  .realm-map { min-width: 0; }
   .realm-map-viewport { height: min(68vh, 38rem); }
   .map-toolbar { grid-template-columns: minmax(8rem, 1fr) minmax(9rem, 1fr); }
   .map-tools { grid-column: 1 / -1; overflow-x: auto; padding-bottom: .1rem; }
@@ -606,7 +610,7 @@
   .realm-header > div:first-child { display: grid; }
   .realm-phase { grid-template-columns: 1fr auto; padding: .65rem .75rem; }
   .realm-players { grid-template-columns: repeat(6, 9.5rem); }
-  .realm-map { min-width: 36rem; }
+  .realm-map { min-width: 0; }
   .realm-map-viewport { height: 62vh; min-height: 27rem; }
   .map-toolbar { grid-template-columns: 1fr; }
   .map-area-picker, .map-tools { grid-column: 1; }
