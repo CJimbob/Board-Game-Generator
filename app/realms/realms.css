@@ -179,64 +179,170 @@
 .realm-players em { position: absolute; right: .45rem; bottom: .2rem; color: #846a30; font-size: .5rem; font-style: normal; }
 .realm-entrust { position: absolute; right: .35rem; bottom: .18rem; border: 1px solid #9f7f44; border-radius: 2px; padding: .18rem .3rem; color: #7c2d2b; background: #fff1d5; font-size: .48rem; font-weight: 800; }
 
-.realm-main-grid { display: grid; grid-template-columns: minmax(52rem, 1fr) minmax(20rem, 24rem); gap: 1rem; padding: 1rem; }
-.realm-map-wrap { min-width: 0; overflow: auto; background: #172d33; border: 1px solid #6d6657; box-shadow: 0 18px 42px rgba(22, 24, 22, .22); }
+.realm-main-grid { display: grid; grid-template-columns: minmax(58rem, 1fr) minmax(20rem, 24rem); gap: 1rem; padding: 1rem; }
+.realm-map-wrap { min-width: 0; overflow: auto; background: #10252c; border: 1px solid #6d6657; box-shadow: 0 18px 42px rgba(22, 24, 22, .22); }
 .realm-map {
   position: relative;
-  min-width: 62rem;
-  min-height: 48rem;
+  min-width: 68rem;
+  aspect-ratio: 17 / 13;
   overflow: hidden;
   background:
-    radial-gradient(ellipse at 50% 45%, rgba(225, 203, 157, .28), transparent 45%),
-    repeating-linear-gradient(12deg, rgba(255, 255, 255, .025) 0 1px, transparent 1px 14px),
-    linear-gradient(145deg, #243d43, #172d34 65%, #11262d);
+    radial-gradient(circle at 14% 17%, rgba(237, 231, 198, .055) 0 1px, transparent 2px),
+    radial-gradient(circle at 72% 70%, rgba(237, 231, 198, .045) 0 1px, transparent 2px),
+    repeating-radial-gradient(ellipse at 50% 55%, transparent 0 15px, rgba(170, 207, 204, .025) 16px 17px),
+    linear-gradient(145deg, #244852, #173740 60%, #102b34);
+  background-size: 23px 27px, 31px 29px, auto, auto;
 }
 .realm-map::before {
-  content: "THE SIX REALMS · 六境图";
+  content: "THE SIX REALMS  /  六境全图";
   position: absolute;
-  left: 2.2rem;
-  bottom: 1.5rem;
-  color: rgba(236, 219, 177, .25);
-  font: 900 1.1rem Georgia, serif;
-  letter-spacing: .25em;
+  z-index: 9;
+  left: 1.7rem;
+  bottom: 1.25rem;
+  color: rgba(236, 219, 177, .42);
+  font: 900 .82rem Georgia, serif;
+  letter-spacing: .3em;
 }
 .realm-map::after {
   content: "";
   position: absolute;
-  inset: 1rem;
+  z-index: 30;
+  inset: .75rem;
   pointer-events: none;
-  border: 1px solid rgba(221, 195, 136, .24);
-  box-shadow: inset 0 0 0 5px rgba(5, 17, 21, .2);
+  border: 1px solid rgba(221, 195, 136, .35);
+  box-shadow: inset 0 0 0 4px rgba(5, 17, 21, .22), inset 0 0 45px rgba(2, 13, 17, .35);
 }
-.map-compass { position: absolute; z-index: 1; right: 2rem; top: 1.8rem; color: rgba(222, 200, 148, .54); font: 3.8rem/1 Georgia, serif; }
+.map-compass { position: absolute; z-index: 20; right: 2.1rem; top: 2rem; color: rgba(235, 211, 151, .64); font: 3.8rem/1 Georgia, serif; text-shadow: 0 2px 10px #0d2830; }
 .map-compass small { position: absolute; left: 50%; top: -1rem; font-size: .58rem; transform: translateX(-50%); }
+.map-legend {
+  position: absolute;
+  z-index: 20;
+  left: 1.6rem;
+  top: 1.55rem;
+  display: flex;
+  gap: .55rem;
+  align-items: center;
+  padding: .42rem .55rem;
+  color: #e8ddc0;
+  background: rgba(8, 29, 35, .78);
+  border: 1px solid rgba(218, 192, 128, .28);
+  box-shadow: 0 8px 24px rgba(1, 12, 16, .24);
+  font-size: .48rem;
+  letter-spacing: .03em;
+}
+.map-legend b { color: #d7bc78; font-family: Georgia, serif; text-transform: uppercase; letter-spacing: .12em; }
+.map-relief { position: absolute; z-index: 5; inset: 0; pointer-events: none; color: rgba(74, 61, 40, .3); }
+.map-relief .ridge { position: absolute; font: 900 .9rem/1 Georgia, serif; letter-spacing: -.12em; transform: rotate(-16deg); }
+.ridge-north { left: 16%; top: 17%; }
+.ridge-east { right: 8%; top: 45%; transform: rotate(74deg) !important; }
+.forest-mark { position: absolute; left: 43%; top: 20%; color: rgba(35, 72, 52, .42); font: 900 1.05rem Georgia, serif; transform: rotate(-9deg); }
+.river-mark { position: absolute; width: 16rem; height: 4rem; border-bottom: 3px double rgba(65, 113, 124, .48); border-radius: 0 0 55% 30%; transform: rotate(36deg); }
+.river-one { left: 34%; top: 33%; }
+.river-two { left: 49%; top: 60%; width: 12rem; transform: rotate(62deg); }
 .realm-area {
   --owner: #877f70;
   position: absolute;
-  z-index: 2;
-  width: 5.4rem;
-  min-height: 3.25rem;
-  transform: translate(-50%, -50%);
-  padding: .34rem .38rem;
+  inset: 0;
+  z-index: 4;
+  pointer-events: none;
   color: #18231f;
-  background: color-mix(in srgb, var(--owner) 22%, #e9dec4);
-  border: 1px solid color-mix(in srgb, var(--owner) 72%, #6f644f);
-  border-radius: 38% 27% 34% 22%;
-  box-shadow: 0 4px 12px rgba(2, 15, 18, .32), inset 0 0 0 1px rgba(255, 255, 255, .28);
-  text-align: left;
 }
-.realm-area:hover { z-index: 20; transform: translate(-50%, -50%) scale(1.11); }
-.realm-area.sea { color: #e8f1ed; background: color-mix(in srgb, var(--owner) 17%, #244d58); border-color: color-mix(in srgb, var(--owner) 50%, #7aa0a5); border-radius: 48%; }
-.realm-area.port { width: 4.25rem; min-height: 2.4rem; color: #f0e4c6; background: color-mix(in srgb, var(--owner) 45%, #4e4331); border-radius: 2px; }
-.realm-area strong { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font: 800 .56rem "Songti SC", STSong, Georgia, serif; }
-.area-icons { display: flex; gap: .22rem; min-height: .75rem; margin-top: .1rem; font-size: .5rem; }
+.realm-area.sea { z-index: 1; color: #e8f1ed; }
+.region-hit {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: auto;
+  cursor: pointer;
+  border: 0;
+  padding: 0;
+  background:
+    repeating-linear-gradient(118deg, transparent 0 8px, rgba(76, 64, 43, .055) 9px 10px),
+    radial-gradient(circle at 40% 35%, rgba(255, 249, 225, .58), transparent 42%),
+    color-mix(in srgb, var(--owner) 34%, #cfc19d);
+  filter: drop-shadow(0 0 1px rgba(57, 46, 30, .95)) drop-shadow(0 5px 6px rgba(3, 18, 21, .14));
+  transition: filter .16s ease, background-color .16s ease;
+}
+.realm-area.sea .region-hit {
+  background:
+    repeating-radial-gradient(ellipse at 30% 50%, transparent 0 12px, rgba(186, 222, 221, .09) 13px 14px),
+    color-mix(in srgb, var(--owner) 16%, #234c57);
+  filter: drop-shadow(0 0 1px rgba(135, 181, 183, .42));
+}
+.realm-area.terrain-mountain .region-hit { background: repeating-linear-gradient(148deg, rgba(74, 64, 47, .09) 0 2px, transparent 2px 11px), color-mix(in srgb, var(--owner) 30%, #c8b995); }
+.realm-area.terrain-forest .region-hit { background: radial-gradient(circle at 35% 40%, rgba(42, 84, 55, .16) 0 2px, transparent 3px), color-mix(in srgb, var(--owner) 31%, #b8b58f); background-size: 13px 13px, auto; }
+.realm-area.terrain-river .region-hit { background: linear-gradient(122deg, transparent 43%, rgba(74, 125, 139, .24) 44% 46%, transparent 47%), color-mix(in srgb, var(--owner) 30%, #c8bd9b); }
+.realm-area.terrain-desert .region-hit { background: repeating-radial-gradient(ellipse at 30% 50%, transparent 0 9px, rgba(118, 74, 39, .12) 10px 11px), color-mix(in srgb, var(--owner) 25%, #d8b983); }
+.realm-area.terrain-marsh .region-hit { background: repeating-linear-gradient(12deg, rgba(62, 91, 70, .12) 0 1px, transparent 1px 8px), color-mix(in srgb, var(--owner) 26%, #abb18d); }
+.realm-area.terrain-field .region-hit { background: repeating-linear-gradient(84deg, rgba(121, 96, 48, .08) 0 1px, transparent 1px 9px), color-mix(in srgb, var(--owner) 27%, #d0c292); }
+.realm-area .region-hit:hover { filter: brightness(1.09) saturate(1.12) drop-shadow(0 0 2px #f3d887) drop-shadow(0 7px 9px rgba(3, 18, 21, .24)); }
+.realm-area.selected .region-hit { filter: brightness(1.08) saturate(1.16) drop-shadow(0 0 3px #f3d887) drop-shadow(0 0 8px rgba(235, 201, 113, .8)); }
+.area-content {
+  position: absolute;
+  z-index: 8;
+  width: max-content;
+  max-width: 6.5rem;
+  display: grid;
+  justify-items: start;
+  transform: translate(-50%, -50%);
+  pointer-events: none;
+  text-align: left;
+  text-shadow: 0 1px rgba(255, 250, 230, .55);
+}
+.realm-area.sea .area-content { opacity: .8; text-shadow: 0 1px 2px #0a252d; }
+.area-content strong { display: block; max-width: 6.4rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font: 900 .58rem "Songti SC", STSong, Georgia, serif; letter-spacing: .03em; }
+.realm-area.sea .area-content strong { font: italic 800 .6rem Georgia, "Songti SC", serif; letter-spacing: .08em; }
+.area-icons { display: flex; gap: .22rem; min-height: .7rem; margin-top: .08rem; font-size: .5rem; }
+.area-icons i { font-style: normal; }
 .area-icons .neutral { color: #9b2429; font-weight: 900; }
 .area-icons .garrison { color: #4a3722; font-weight: 900; }
 .area-units { display: flex; gap: .12rem; flex-wrap: wrap; }
-.area-units span { width: 1rem; height: 1rem; display: grid; place-items: center; color: white; border: 1px solid rgba(255, 255, 255, .5); border-radius: 50%; font-size: .48rem; font-weight: 900; text-shadow: 0 1px 2px #000; }
-.area-units span.routed { filter: grayscale(.8); transform: rotate(90deg); opacity: .58; }
-.map-order { position: absolute; right: -.45rem; bottom: -.45rem; max-width: 4.8rem; padding: .18rem .3rem; color: #f7eed7; background: #222b29; border: 1px solid #d5bd7d; border-radius: 50%; font-size: .42rem; font-weight: 800; text-align: center; }
+.area-units i { width: 1rem; height: 1rem; display: grid; place-items: center; color: white; border: 1px solid rgba(255, 255, 255, .62); border-radius: 50%; box-shadow: 0 2px 4px rgba(9, 18, 18, .35); font-size: .48rem; font-style: normal; font-weight: 900; text-shadow: 0 1px 2px #000; }
+.area-units i.routed { filter: grayscale(.8); transform: rotate(90deg); opacity: .58; }
+.map-order { position: absolute; left: calc(100% - .25rem); top: calc(100% - .2rem); max-width: 4.8rem; padding: .18rem .3rem; color: #f7eed7; background: #222b29; border: 1px solid #d5bd7d; border-radius: 50%; box-shadow: 0 2px 6px rgba(5, 13, 13, .38); font-size: .42rem; font-style: normal; font-weight: 800; text-align: center; text-shadow: none; }
 .map-order.hidden { width: 1.4rem; height: 1.4rem; display: grid; place-items: center; color: #e7cb84; font-size: .72rem; }
+.realm-port {
+  --owner: #806c4e;
+  position: absolute;
+  z-index: 14;
+  width: 2.15rem;
+  height: 2.15rem;
+  display: grid;
+  place-items: center;
+  transform: translate(-50%, -50%) rotate(45deg);
+  cursor: pointer;
+  color: #f5ead0;
+  background: color-mix(in srgb, var(--owner) 66%, #473a2c);
+  border: 2px solid #d8bd79;
+  box-shadow: 0 4px 10px rgba(2, 14, 17, .5), inset 0 0 0 2px rgba(255,255,255,.13);
+}
+.realm-port::before { content: "⚓"; transform: rotate(-45deg); font-size: .88rem; }
+.realm-port.selected { box-shadow: 0 0 0 3px rgba(246, 215, 132, .5), 0 4px 10px rgba(2, 14, 17, .5); }
+.realm-port .area-content { width: 5rem; left: 50% !important; top: calc(100% + 1.05rem) !important; transform: translate(-50%, 0) rotate(-45deg); align-items: center; color: #f0e5c9; text-shadow: 0 1px 2px #091c21; }
+.realm-port .area-content strong { width: 5rem; text-align: center; font-size: .46rem; }
+.realm-port .area-icons { display: none; }
+.realm-port .area-units { position: absolute; bottom: 1.8rem; left: 1.45rem; min-width: 4rem; }
+.realm-port .map-order { left: 1.3rem; top: 1.3rem; }
+.map-inspector {
+  --owner: #9a8d70;
+  position: absolute;
+  z-index: 22;
+  right: 1.55rem;
+  bottom: 1.4rem;
+  width: min(19rem, 34%);
+  display: grid;
+  gap: .2rem;
+  padding: .75rem .85rem .78rem 1rem;
+  color: #eee4ca;
+  background: linear-gradient(110deg, rgba(8, 24, 29, .91), rgba(14, 38, 43, .87));
+  border: 1px solid color-mix(in srgb, var(--owner) 58%, #d2b873);
+  border-left: 4px solid var(--owner);
+  box-shadow: 0 10px 28px rgba(0, 13, 17, .34);
+}
+.map-inspector span { color: #cbb984; font-size: .45rem; font-weight: 900; letter-spacing: .08em; text-transform: uppercase; }
+.map-inspector strong { font: 900 .95rem "Songti SC", STSong, Georgia, serif; }
+.map-inspector small { color: #b9c5c0; font-size: .5rem; line-height: 1.5; }
 
 .realm-command { display: flex; flex-direction: column; gap: .8rem; }
 .influence-card,

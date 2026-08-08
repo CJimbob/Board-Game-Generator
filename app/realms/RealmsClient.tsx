@@ -208,9 +208,93 @@ function PlayerRibbon({ game, language, act }: { game: Game; language: Language;
   return <div className="realm-players">{game.players.map((player) => { const faction = game.factions.find((item) => item.key === player.faction); const active = game.currentPlayerId === player.id; return <article key={player.id} className={active ? "active" : ""} style={{ "--faction": faction?.color ?? "#777" } as CSSProperties}><i /><div><strong>{player.name}{player.isBot ? " · AI" : !player.isOnline ? text(" · 断线", " · offline") : ""}</strong><small>{faction ? (language === "zh" ? faction.name : faction.nameEn) : text("等待分配", "Unassigned")}</small></div><b>♜ {player.castles}/7</b><span>◆ {player.power} · ▰ {player.supply}</span>{game.phase === "planning" && <em>{player.submitted ? text("已封存", "Locked") : text("下令中", "Planning")}</em>}{isHost && game.phase !== "lobby" && game.phase !== "finished" && player.id !== game.viewerId && !player.isBot && !player.isOnline && <button className="realm-entrust" onClick={() => act("entrust", { targetPlayerId: player.id })}>{text("交给 AI", "Entrust to AI")}</button>}</article>; })}</div>;
 }
 
+const REGION_PATHS: Record<string, string> = {
+  northhold: "38% 3%,55% 3%,64% 11%,57% 18%,42% 17%,34% 10%",
+  frozen_pass: "20% 4%,38% 3%,34% 10%,38% 17%,29% 21%,18% 14%",
+  high_peaks: "12% 13%,20% 4%,18% 14%,29% 21%,22% 29%,10% 25%",
+  ice_coast: "29% 21%,38% 17%,43% 27%,35% 34%,22% 29%",
+  wolfwood: "38% 17%,57% 18%,55% 28%,43% 27%",
+  crown_road: "57% 18%,64% 11%,73% 20%,69% 30%,55% 28%",
+  shadow_fort: "10% 25%,22% 29%,24% 40%,15% 48%,7% 40%",
+  riverwatch: "22% 29%,35% 34%,43% 27%,49% 38%,39% 45%,24% 40%",
+  west_hills: "15% 48%,24% 40%,39% 45%,35% 55%,19% 59%,10% 53%",
+  moon_gate: "69% 30%,73% 20%,83% 25%,88% 34%,82% 38%,76% 39%,67% 40%",
+  goldhaven: "10% 53%,19% 59%,18% 69%,10% 72%,4% 64%",
+  central_plains: "39% 45%,49% 38%,55% 28%,67% 40%,64% 52%,51% 57%,35% 55%",
+  throne_city: "64% 52%,67% 40%,76% 39%,74% 48%,75% 54%,73% 60%",
+  sunfield: "19% 59%,35% 55%,51% 57%,45% 67%,28% 69%,18% 69%",
+  highgarden: "28% 69%,45% 67%,52% 76%,43% 84%,27% 80%",
+  red_desert: "18% 69%,28% 69%,27% 80%,20% 90%,9% 85%,10% 72%",
+  lower_river: "45% 67%,51% 57%,64% 52%,73% 60%,66% 72%,52% 76%",
+  stormlands: "73% 60%,75% 54%,82% 52%,88% 58%,86% 70%,75% 74%,66% 72%",
+  east_hills: "82% 52%,81% 46%,82% 38%,88% 34%,94% 41%,93% 52%,88% 58%",
+  ember_keep: "52% 76%,66% 72%,75% 74%,76% 86%,63% 93%,43% 84%",
+  red_steppe: "75% 74%,86% 70%,94% 73%,94% 86%,80% 92%,76% 86%",
+  tidewatch: "88% 34%,93% 27%,98% 32%,99% 44%,93% 52%,94% 41%",
+  salt_marsh: "86% 70%,88% 58%,93% 52%,99% 57%,99% 72%,94% 73%",
+  glass_isle: "3% 72%,11% 70%,17% 75%,15% 86%,7% 90%,2% 83%",
+  frozen_sea: "0% 0%,100% 0%,100% 22%,83% 25%,73% 20%,64% 11%,55% 3%,38% 3%,20% 4%,12% 13%,0% 20%",
+  western_sea: "0% 20%,12% 13%,10% 25%,7% 40%,10% 53%,4% 64%,0% 64%",
+  golden_bay: "0% 55%,10% 53%,4% 64%,10% 72%,3% 72%,0% 74%",
+  southern_sea: "0% 74%,3% 72%,2% 83%,7% 90%,20% 90%,27% 80%,43% 84%,63% 93%,66% 100%,0% 100%",
+  ember_sea: "66% 100%,63% 93%,80% 92%,94% 86%,100% 87%,100% 100%",
+  eastern_sea: "100% 22%,83% 25%,93% 27%,98% 32%,99% 44%,93% 52%,99% 57%,99% 72%,94% 73%,94% 86%,100% 87%",
+  central_strait: "76% 39%,82% 38%,81% 46%,82% 52%,75% 54%,74% 48%",
+};
+
+const AREA_TERRAIN: Record<string, string> = {
+  high_peaks: "mountain", frozen_pass: "mountain", east_hills: "mountain", ember_keep: "mountain",
+  wolfwood: "forest", shadow_fort: "forest", riverwatch: "river", lower_river: "river",
+  red_desert: "desert", red_steppe: "desert", salt_marsh: "marsh", sunfield: "field",
+};
+
 function RealmMap({ game, language }: { game: Game; language: Language }) {
   const factionMap = new Map(game.factions.map((faction) => [faction.key, faction]));
-  return <div className="realm-map" role="img" aria-label={language === "zh" ? "六境战争版图" : "Map of the Six Realms"}><div className="map-compass">✦<small>N</small></div>{game.areaDefinitions.map((definition) => { const state = game.areas[definition.key]; const owner = state.units[0]?.faction ?? state.control; const faction = owner ? factionMap.get(owner) : null; const units = state.units; return <button key={definition.key} className={`realm-area ${definition.kind} ${state.order ? "has-order" : ""}`} style={{ left: `${definition.x}%`, top: `${definition.y}%`, "--owner": faction?.color ?? "#877f70" } as CSSProperties} title={language === "zh" ? definition.name : definition.nameEn}><strong>{language === "zh" ? definition.name : definition.nameEn}</strong><div className="area-icons">{definition.castle && <span>♜{definition.castle}</span>}{definition.supply && <span>▰{definition.supply}</span>}{definition.power && <span>◆{definition.power}</span>}{state.neutral && <span className="neutral">⚔{state.neutral >= 99 ? "∞" : state.neutral}</span>}{state.garrison && <span className="garrison">▣{state.garrison}</span>}</div>{units.length > 0 && <div className="area-units">{units.map((unit) => <span key={unit.id} className={unit.routed ? "routed" : ""} style={{ background: factionMap.get(unit.faction)?.color }}>{UNIT_LABELS[unit.type][0]}</span>)}</div>}{state.order && <span className={`map-order ${state.order === "hidden" ? "hidden" : ""}`}>{state.order === "hidden" ? "?" : ORDER_LABELS[state.order as Order][language === "zh" ? 0 : 1]}</span>}</button>; })}</div>;
+  const [selectedKey, setSelectedKey] = useState("throne_city");
+  const selectedDefinition = game.areaDefinitions.find((area) => area.key === selectedKey) ?? game.areaDefinitions[0];
+  const selectedState = selectedDefinition ? game.areas[selectedDefinition.key] : null;
+  const selectedOwnerKey = selectedState?.units[0]?.faction ?? selectedState?.control;
+  const selectedOwner = selectedOwnerKey ? factionMap.get(selectedOwnerKey) : null;
+  const kindLabel = selectedDefinition?.kind === "sea" ? (language === "zh" ? "海域" : "Sea") : selectedDefinition?.kind === "port" ? (language === "zh" ? "港口" : "Port") : (language === "zh" ? "陆地" : "Land");
+
+  const renderContents = (definition: AreaDefinition) => {
+    const state = game.areas[definition.key];
+    const units = state.units;
+    return <span className="area-content" style={{ left: `${definition.x}%`, top: `${definition.y}%` }}>
+      <strong>{language === "zh" ? definition.name : definition.nameEn}</strong>
+      <span className="area-icons">{definition.castle && <i>♜{definition.castle}</i>}{definition.supply && <i>▰{definition.supply}</i>}{definition.power && <i>◆{definition.power}</i>}{state.neutral && <i className="neutral">⚔{state.neutral >= 99 ? "∞" : state.neutral}</i>}{state.garrison && <i className="garrison">▣{state.garrison}</i>}</span>
+      {units.length > 0 && <span className="area-units">{units.map((unit) => <i key={unit.id} className={unit.routed ? "routed" : ""} style={{ background: factionMap.get(unit.faction)?.color }}>{UNIT_LABELS[unit.type][0]}</i>)}</span>}
+      {state.order && <i className={`map-order ${state.order === "hidden" ? "hidden" : ""}`}>{state.order === "hidden" ? "?" : ORDER_LABELS[state.order as Order][language === "zh" ? 0 : 1]}</i>}
+    </span>;
+  };
+
+  const regions = game.areaDefinitions.filter((definition) => definition.kind !== "port");
+  const ports = game.areaDefinitions.filter((definition) => definition.kind === "port");
+  return <div className="realm-map" aria-label={language === "zh" ? "六境战争版图" : "Map of the Six Realms"}>
+    <div className="map-compass" aria-hidden="true">✦<small>N</small></div>
+    <div className="map-legend"><b>{language === "zh" ? "版图标记" : "Map key"}</b><span>♜ {language === "zh" ? "城堡" : "Castle"}</span><span>▰ {language === "zh" ? "补给" : "Supply"}</span><span>◆ {language === "zh" ? "威望" : "Power"}</span></div>
+    <div className="map-relief" aria-hidden="true"><span className="ridge ridge-north">▲ ▲ ▲ ▲</span><span className="ridge ridge-east">▲ ▲ ▲</span><span className="forest-mark">♠ ♠ ♠</span><span className="river-mark river-one" /><span className="river-mark river-two" /></div>
+    {regions.map((definition) => {
+      const state = game.areas[definition.key];
+      const owner = state.units[0]?.faction ?? state.control;
+      const faction = owner ? factionMap.get(owner) : null;
+      return <article key={definition.key} className={`realm-area ${definition.kind} terrain-${AREA_TERRAIN[definition.key] ?? "plain"} ${state.order ? "has-order" : ""} ${selectedKey === definition.key ? "selected" : ""}`} style={{ "--owner": faction?.color ?? (definition.kind === "sea" ? "#3d7380" : "#9a8d70") } as CSSProperties}>
+        <button className="region-hit" style={{ clipPath: `polygon(${REGION_PATHS[definition.key]})` }} onClick={() => setSelectedKey(definition.key)} aria-label={language === "zh" ? definition.name : definition.nameEn} title={language === "zh" ? definition.name : definition.nameEn} />
+        {renderContents(definition)}
+      </article>;
+    })}
+    {ports.map((definition) => {
+      const state = game.areas[definition.key];
+      const owner = state.units[0]?.faction ?? state.control;
+      const faction = owner ? factionMap.get(owner) : null;
+      return <button key={definition.key} className={`realm-port ${selectedKey === definition.key ? "selected" : ""}`} style={{ left: `${definition.x}%`, top: `${definition.y}%`, "--owner": faction?.color ?? "#806c4e" } as CSSProperties} onClick={() => setSelectedKey(definition.key)}>{renderContents(definition)}</button>;
+    })}
+    {selectedDefinition && selectedState && <aside className="map-inspector" style={{ "--owner": selectedOwner?.color ?? "#9a8d70" } as CSSProperties}>
+      <span>{kindLabel} · {selectedOwner ? (language === "zh" ? selectedOwner.name : selectedOwner.nameEn) : (language === "zh" ? "未控制" : "Uncontrolled")}</span>
+      <strong>{language === "zh" ? selectedDefinition.name : selectedDefinition.nameEn}</strong>
+      <small>{language === "zh" ? "相邻" : "Adjacent"}: {selectedDefinition.adjacent.map((id) => areaName(game, id, language)).join(" · ")}</small>
+    </aside>}
+  </div>;
 }
 
 function InfluenceTracks({ game, language }: { game: Game; language: Language }) {
