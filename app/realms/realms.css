@@ -223,8 +223,8 @@
   overflow: hidden;
   background-color: #173740;
   background-image:
-    linear-gradient(rgba(8, 25, 29, .015), rgba(8, 25, 29, .075)),
-    image-set(url("/realms-board-v3.webp") 1x, url("/realms-board-v3-hidpi.webp") 2x);
+    linear-gradient(rgba(245, 231, 193, .015), rgba(45, 34, 22, .025)),
+    image-set(url("/realms-board-v4-classic.webp") 1x, url("/realms-board-v4-classic-hidpi.webp") 2x);
   background-position: center;
   background-size: cover;
   background-repeat: no-repeat;
@@ -262,8 +262,8 @@
 .map-compass { position: absolute; z-index: 20; right: 19%; top: 2rem; color: rgba(235, 211, 151, .64); font: 3.8rem/1 Georgia, serif; text-shadow: 0 2px 10px #0d2830; }
 .map-compass small { position: absolute; left: 50%; top: -1rem; font-size: .58rem; transform: translateX(-50%); }
 .realm-region-overlay { position: absolute; z-index: 2; inset: 0; width: 100%; height: 100%; pointer-events: none; }
-.realm-region-overlay polygon { fill: var(--region-owner); fill-opacity: .09; stroke: rgba(241, 226, 188, .48); stroke-width: .11; vector-effect: non-scaling-stroke; transition: fill-opacity .15s ease, stroke-width .15s ease; }
-.realm-region-overlay polygon.sea { fill-opacity: .035; stroke: rgba(147, 199, 205, .36); stroke-width: .13; }
+.realm-region-overlay polygon { fill: var(--region-owner); fill-opacity: .035; stroke: rgba(255, 246, 216, .62); stroke-width: .12; vector-effect: non-scaling-stroke; transition: fill-opacity .15s ease, stroke-width .15s ease; }
+.realm-region-overlay polygon.sea { fill-opacity: .018; stroke: rgba(224, 232, 216, .42); stroke-width: .13; }
 .realm-region-overlay polygon.blocked { fill: rgba(56, 34, 31, .72); fill-opacity: .58; stroke: rgba(198, 105, 83, .8); stroke-dasharray: .7 .55; }
 .realm-region-overlay polygon.actionable { fill: #f0cb68; fill-opacity: .13; stroke: #e9ca76; stroke-width: .2; stroke-dasharray: .55 .32; }
 .realm-region-overlay polygon.action-selected { fill: #f0cb68; fill-opacity: .21; stroke: #ffe4a0; stroke-width: .28; }
