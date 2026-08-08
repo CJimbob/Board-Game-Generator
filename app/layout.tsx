@@ -12,9 +12,9 @@ export async function generateMetadata(): Promise<Metadata> {
     requestHeaders.get("x-forwarded-proto") ??
     (host.includes("localhost") ? "http" : "https");
   const origin = `${protocol}://${host}`;
-  const title = "王冠之城｜线上秘密选角桌游";
+  const title = "王冠游戏厅｜王冠之城 × 六境争霸";
   const description =
-    "邀请朋友进入同一房间，秘密选择角色、获取金币并建造属于你们的城市。";
+    "两款独立在线策略桌游：秘密选角建造王城，或秘密下令统一六境。";
 
   return {
     title,
@@ -24,7 +24,7 @@ export async function generateMetadata(): Promise<Metadata> {
       title,
       description,
       type: "website",
-      images: [{ url: `${origin}/og.png`, width: 1731, height: 909, alt: "王冠之城" }],
+      images: [{ url: `${origin}/og.png`, width: 1731, height: 909, alt: "王冠之城与六境争霸双游戏大厅" }],
     },
     twitter: {
       card: "summary_large_image",

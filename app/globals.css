@@ -31,7 +31,7 @@ button, input, select { font: inherit; }
 button { cursor: pointer; }
 button:disabled { cursor: not-allowed; opacity: 0.46; }
 
-.realms-entry-link {
+.game-hub-link {
   display: flex;
   align-items: center;
   gap: .8rem;
@@ -44,12 +44,110 @@ button:disabled { cursor: not-allowed; opacity: 0.46; }
   text-decoration: none;
   box-shadow: 0 10px 24px rgba(11, 19, 33, .16);
 }
-.realms-entry-link > span { color: var(--gold-light); font-size: 1.4rem; }
-.realms-entry-link > div { display: grid; flex: 1; gap: .1rem; }
-.realms-entry-link strong { font: 800 .82rem "Songti SC", "STSong", Georgia, serif; }
-.realms-entry-link small { color: rgba(248, 240, 223, .62); font-size: .62rem; }
-.realms-entry-link > b { color: var(--gold-light); transition: transform .18s ease; }
-.realms-entry-link:hover > b { transform: translateX(.25rem); }
+.game-hub-link > span { color: var(--gold-light); font-size: 1.4rem; }
+.game-hub-link > div { display: grid; flex: 1; gap: .1rem; }
+.game-hub-link strong { font: 800 .82rem "Songti SC", "STSong", Georgia, serif; }
+.game-hub-link small { color: rgba(248, 240, 223, .62); font-size: .62rem; }
+.game-hub-link > b { color: var(--gold-light); transition: transform .18s ease; }
+.game-hub-link:hover > b { transform: translateX(.25rem); }
+
+.hub-shell {
+  position: relative;
+  min-height: 100vh;
+  overflow: hidden;
+  color: #f8f0df;
+  background:
+    radial-gradient(circle at 12% 42%, rgba(201, 155, 69, .15), transparent 28rem),
+    radial-gradient(circle at 88% 45%, rgba(73, 122, 126, .16), transparent 30rem),
+    linear-gradient(135deg, #0d1625 0%, #15233a 50%, #0d1d25 100%);
+  isolation: isolate;
+}
+.hub-shell::before {
+  content: "";
+  position: absolute;
+  z-index: -1;
+  inset: 1.2rem;
+  border: 1px solid rgba(231, 201, 135, .14);
+  pointer-events: none;
+}
+.hub-header {
+  width: min(86rem, calc(100% - 3rem));
+  min-height: 5rem;
+  margin: 0 auto;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  border-bottom: 1px solid rgba(231, 201, 135, .16);
+}
+.hub-brand { display: flex; align-items: center; gap: .65rem; color: inherit; text-decoration: none; }
+.hub-brand span { color: var(--gold-light); font-size: 1.5rem; }
+.hub-brand b { font: 900 .82rem "Songti SC", "STSong", Georgia, serif; letter-spacing: .16em; }
+.hub-language {
+  border: 1px solid rgba(232, 202, 131, .34);
+  border-radius: 999px;
+  padding: .42rem .72rem;
+  color: var(--gold-light);
+  background: rgba(255, 255, 255, .035);
+  font-size: .67rem;
+  font-weight: 900;
+}
+.hub-intro {
+  width: min(65rem, calc(100% - 3rem));
+  margin: clamp(3.3rem, 7vw, 6.5rem) auto clamp(2.2rem, 4vw, 3.5rem);
+  text-align: center;
+}
+.hub-kicker { margin: 0 0 1rem !important; color: var(--gold-light) !important; font: 800 .66rem Georgia, serif !important; letter-spacing: .42em; }
+.hub-intro h1 { margin: 0; font: 900 clamp(3.3rem, 7vw, 7rem)/.95 "Songti SC", "STSong", Georgia, serif; letter-spacing: -.055em; }
+.hub-intro > p:not(.hub-kicker) { max-width: 44rem; margin: 1.25rem auto 0; color: rgba(248, 240, 223, .6); font-size: .86rem; line-height: 1.85; }
+.hub-games {
+  width: min(76rem, calc(100% - 3rem));
+  margin: 0 auto;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 1.2rem;
+}
+.hub-card {
+  position: relative;
+  min-width: 0;
+  overflow: hidden;
+  display: grid;
+  grid-template-columns: minmax(9rem, .75fr) minmax(0, 1.25fr);
+  min-height: 25rem;
+  color: inherit;
+  border: 1px solid rgba(234, 208, 150, .24);
+  background: rgba(255, 255, 255, .035);
+  text-decoration: none;
+  box-shadow: 0 24px 65px rgba(2, 8, 18, .24);
+  transition: transform .22s ease, border-color .22s ease, box-shadow .22s ease;
+}
+.hub-card:hover, .hub-card:focus-visible { transform: translateY(-5px); border-color: rgba(232, 202, 131, .58); box-shadow: 0 30px 78px rgba(2, 8, 18, .4); outline: none; }
+.hub-card-art { position: relative; overflow: hidden; display: grid; place-items: center; border-right: 1px solid rgba(234, 208, 150, .16); isolation: isolate; }
+.hub-city .hub-card-art { background: radial-gradient(circle at 50% 38%, rgba(226, 180, 82, .28), transparent 10rem), linear-gradient(165deg, #26334b, #151d2e); }
+.hub-realms .hub-card-art { background: radial-gradient(circle at 50% 42%, rgba(124, 158, 139, .26), transparent 10rem), linear-gradient(165deg, #274144, #142427); }
+.hub-card-art::before, .hub-card-art::after { content: ""; position: absolute; z-index: -1; border: 1px solid rgba(232, 202, 131, .14); transform: rotate(45deg); }
+.hub-card-art::before { width: 13rem; height: 13rem; }
+.hub-card-art::after { width: 9rem; height: 9rem; }
+.hub-card-sigil { position: relative; z-index: 2; color: #d8ae5c; font-size: clamp(4rem, 8vw, 6.5rem); line-height: 1; filter: drop-shadow(0 16px 28px rgba(0, 0, 0, .35)); }
+.city-skyline { position: absolute; bottom: 0; width: 3.2rem; background: rgba(8, 14, 25, .62); clip-path: polygon(0 100%, 0 26%, 20% 26%, 20% 10%, 36% 10%, 50% 0, 64% 10%, 80% 10%, 80% 32%, 100% 32%, 100% 100%); }
+.city-skyline-one { left: 0; height: 8rem; }
+.city-skyline-two { left: 37%; width: 4rem; height: 6rem; }
+.city-skyline-three { right: 0; height: 9.5rem; }
+.realm-contour { position: absolute; border: 1px solid rgba(218, 195, 137, .25); background: rgba(199, 164, 88, .035); transform: rotate(-13deg); }
+.realm-contour-one { width: 9rem; height: 12rem; left: -3rem; top: 2rem; border-radius: 38% 62% 49% 51% / 62% 39% 61% 38%; }
+.realm-contour-two { width: 10rem; height: 11rem; right: -4rem; bottom: 1rem; border-radius: 63% 37% 32% 68% / 40% 52% 48% 60%; }
+.realm-contour-three { width: 6rem; height: 8rem; left: 37%; bottom: -3rem; border-radius: 45% 55% 67% 33% / 56% 45% 55% 44%; }
+.hub-card-copy { display: flex; flex-direction: column; padding: clamp(1.6rem, 3vw, 2.4rem); }
+.hub-card-number { color: var(--gold-light); font: 800 .58rem Georgia, serif; letter-spacing: .32em; }
+.hub-card h2 { margin: .75rem 0 1rem; font: 900 clamp(2.3rem, 4vw, 3.6rem)/1 "Songti SC", "STSong", Georgia, serif; letter-spacing: -.045em; }
+.hub-card-copy > p { margin: 0; min-height: 4.5rem; color: rgba(248, 240, 223, .61); font-size: .74rem; line-height: 1.75; }
+.hub-card ul { display: grid; gap: .55rem; margin: 1.1rem 0 2rem; padding: 0; list-style: none; color: rgba(248, 240, 223, .72); font-size: .65rem; }
+.hub-card li::before { content: "◆"; margin-right: .55rem; color: #d8ae5c; font-size: .45rem; }
+.hub-enter { margin-top: auto; display: flex; align-items: center; justify-content: space-between; padding-top: 1rem; border-top: 1px solid rgba(232, 202, 131, .18); color: #f3d58e; font: 900 .72rem "Songti SC", "STSong", Georgia, serif; letter-spacing: .08em; }
+.hub-enter b { font-size: 1.1rem; transition: transform .2s ease; }
+.hub-card:hover .hub-enter b { transform: translateX(.3rem); }
+.hub-footer { width: min(76rem, calc(100% - 3rem)); margin: 2rem auto 0; padding: 0 0 2.6rem; display: flex; justify-content: center; align-items: center; flex-wrap: wrap; gap: .75rem; color: rgba(248, 240, 223, .42); font-size: .6rem; letter-spacing: .08em; }
+.hub-footer i { width: 2px; height: 2px; border-radius: 50%; background: var(--gold); }
 
 .reference-link {
   display: inline;
@@ -296,7 +394,8 @@ button:disabled { cursor: not-allowed; opacity: 0.46; }
 .brand span { color: var(--gold-light); margin-right: 0.5rem; }
 .round-status { color: rgba(248, 240, 223, 0.72); font-size: 0.78rem; letter-spacing: 0.1em; }
 .round-status span { color: var(--gold-light); border: 1px solid rgba(232, 202, 131, 0.28); padding: 0.3rem 0.55rem; margin-right: 0.6rem; }
-.header-room, .header-recovery, .header-leave, .header-claim, .header-history, .header-sound { color: rgba(248, 240, 223, 0.7); background: transparent; border: 0; font-size: 0.68rem; white-space: nowrap; }
+.header-room, .header-recovery, .header-leave, .header-claim, .header-history, .header-sound, .header-hub { color: rgba(248, 240, 223, 0.7); background: transparent; border: 0; font-size: 0.68rem; white-space: nowrap; }
+.header-hub { color: var(--gold-light); text-decoration: none; }
 .header-recovery { color: var(--gold-light); border-bottom: 1px dashed rgba(232,202,131,.35); }
 .header-leave { color: #efb0a8; }
 .header-history { color: var(--gold-light); }
@@ -619,6 +718,8 @@ button:disabled { cursor: not-allowed; opacity: 0.46; }
 @keyframes counterspin { to { transform: rotate(-360deg); } }
 
 @media (max-width: 980px) {
+  .hub-games { max-width: 42rem; grid-template-columns: 1fr; }
+  .hub-card { min-height: 22rem; }
   .landing-shell { grid-template-columns: 1fr; }
   .landing-copy { min-height: auto; padding: 5rem 2rem; }
   .entry-panel { min-height: 35rem; padding: 3rem 2rem; }
@@ -631,6 +732,13 @@ button:disabled { cursor: not-allowed; opacity: 0.46; }
 }
 
 @media (max-width: 680px) {
+  .hub-shell::before { inset: .55rem; }
+  .hub-header, .hub-intro, .hub-games, .hub-footer { width: calc(100% - 2rem); }
+  .hub-intro { margin-top: 3rem; }
+  .hub-intro h1 { font-size: 3.35rem; }
+  .hub-card { grid-template-columns: 1fr; min-height: 0; }
+  .hub-card-art { min-height: 11rem; border-right: 0; border-bottom: 1px solid rgba(234, 208, 150, .16); }
+  .hub-card-copy > p { min-height: 0; }
   .landing-copy { padding: 4rem 1.3rem; }
   .landing-copy::before { inset: .75rem; }
   .landing-copy h1 { font-size: 4.4rem; }
@@ -640,6 +748,7 @@ button:disabled { cursor: not-allowed; opacity: 0.46; }
   .round-status { display: none; }
   .network-status { margin-left: 0; }
   .header-room, .header-recovery { order: 10; font-size: .6rem; }
+  .header-hub { font-size: .6rem; }
   .header-history, .header-sound { font-size: .6rem; }
   .header-leave { order: 11; }
   .game-header .language-toggle { padding: .32rem .55rem; }

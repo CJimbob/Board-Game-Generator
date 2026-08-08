@@ -1,5 +1,5 @@
-import { GameClient } from "./GameClient";
+import { HomeClient } from "./HomeClient";
 
 export default function Home() {
-  return <GameClient />;
+  return <HomeClient />;
 }
