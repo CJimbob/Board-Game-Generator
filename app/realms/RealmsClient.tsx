@@ -302,7 +302,8 @@ const AREA_TERRAIN: Record<string, string> = {
 
 function MapUnitPiece({ unit, color, language }: { unit: Unit; color?: string; language: Language }) {
   const label = UNIT_LABELS[unit.type][language === "zh" ? 1 : 2];
-  return <span className={`map-unit-piece ${unit.type} ${unit.routed ? "routed" : ""}`} style={{ "--unit-color": color ?? "#667" } as CSSProperties} title={label} aria-label={label}><i className="unit-shape" aria-hidden="true" /></span>;
+  const glyph = language === "zh" ? UNIT_LABELS[unit.type][0] : ({ footman: "F", knight: "K", ship: "S", siege: "G" } as const)[unit.type];
+  return <span className={`map-unit-piece ${unit.type} ${unit.routed ? "routed" : ""}`} style={{ "--unit-color": color ?? "#667" } as CSSProperties} title={label} aria-label={label}><b className="unit-glyph" aria-hidden="true">{glyph}</b></span>;
 }
 
 function RealmMap({ game, language, inspectedKey, actionKey, onInspect, selectableAreaIds }: { game: Game; language: Language; inspectedKey: string; actionKey: string; onInspect: (areaId: string) => void; selectableAreaIds: string[] }) {

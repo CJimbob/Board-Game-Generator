@@ -381,14 +381,15 @@
 .area-icons .neutral { color: #9b2429; font-weight: 900; }
 .area-icons .garrison { color: #4a3722; font-weight: 900; }
 .area-icons .blocked { color: #872e2c; font-weight: 900; }
-.area-units { display: flex; gap: .18rem; flex-wrap: wrap; margin-top: .12rem; }
+.area-units { display: flex; gap: .22rem; flex-wrap: wrap; max-width: 5rem; margin-top: .12rem; }
 .map-unit-piece {
   --unit-color: #667;
   position: relative;
-  width: 1.55rem;
-  height: 1.55rem;
-  flex: 0 0 1.55rem;
-  display: block;
+  width: 1.95rem;
+  height: 1.95rem;
+  flex: 0 0 1.95rem;
+  display: grid;
+  place-items: center;
   color: #fff8e7;
   background: linear-gradient(145deg, color-mix(in srgb, var(--unit-color) 82%, white), color-mix(in srgb, var(--unit-color) 76%, #111));
   border: 1px solid color-mix(in srgb, var(--unit-color) 48%, white);
@@ -396,6 +397,7 @@
   box-shadow: 0 3px 7px rgba(5, 15, 16, .5), inset 0 0 0 1px rgba(255,255,255,.12);
   filter: drop-shadow(0 1px 0 rgba(0,0,0,.25));
 }
+.map-unit-piece .unit-glyph { position: relative; z-index: 2; color: #fff9e9; font: 900 .76rem/1 "Songti SC", STSong, Georgia, serif; text-shadow: 0 1px 2px rgba(0,0,0,.82); }
 .map-unit-piece .unit-shape { position: absolute; inset: .18rem; display: block; color: #fff7e7; font-style: normal; filter: drop-shadow(0 1px 1px rgba(0,0,0,.65)); }
 .map-unit-piece.footman .unit-shape::before { content: ""; position: absolute; width: .34rem; height: .34rem; left: 50%; top: .05rem; transform: translateX(-50%); background: currentColor; border-radius: 50%; }
 .map-unit-piece.footman .unit-shape::after { content: ""; position: absolute; width: .76rem; height: .72rem; left: 50%; bottom: .02rem; transform: translateX(-50%); background: currentColor; clip-path: polygon(36% 0, 64% 0, 70% 23%, 100% 43%, 86% 58%, 69% 49%, 77% 100%, 23% 100%, 31% 49%, 14% 58%, 0 43%, 30% 23%); }
@@ -483,7 +485,8 @@
 .board-influence li { display: flex; align-items: center; gap: .3rem; min-height: 1.4rem; padding: 0 .35rem; color: #e2e8e2; background: rgba(255,255,255,.045); border-left: 2px solid var(--faction); font: 800 .53rem Georgia, serif; }
 .board-influence li i { width: .48rem; height: .48rem; background: var(--faction); border: 1px solid rgba(255,255,255,.5); border-radius: 50%; box-shadow: 0 1px 4px rgba(0,0,0,.45); }
 .map-inspector-units { display: flex; gap: .25rem; margin: .22rem 0 .3rem; }
-.map-inspector-units .map-unit-piece { width: 1.8rem; height: 1.8rem; flex-basis: 1.8rem; }
+.map-inspector-units .map-unit-piece { width: 2.2rem; height: 2.2rem; flex-basis: 2.2rem; }
+.map-inspector-units .unit-glyph { font-size: .86rem; }
 
 .realm-command { display: flex; flex-direction: column; gap: .8rem; }
 .influence-card,
