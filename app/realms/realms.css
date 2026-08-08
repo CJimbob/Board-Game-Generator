@@ -376,11 +376,13 @@
 .compact-labels .realm-area.quiet:not(.selectable):not(.inspected):not(.action-selected) .area-content { opacity: 0; pointer-events: none; }
 .compact-labels .realm-area.sea.quiet:not(.inspected) .area-content { opacity: .38; }
 .show-all-labels .realm-area.quiet .area-content { opacity: .82; }
-.area-icons { display: flex; gap: .22rem; min-height: .7rem; margin-top: .08rem; font-size: .5rem; }
-.area-icons i { font-style: normal; }
-.area-icons .neutral { color: #9b2429; font-weight: 900; }
-.area-icons .garrison { color: #4a3722; font-weight: 900; }
-.area-icons .blocked { color: #872e2c; font-weight: 900; }
+.area-icons { display: flex; gap: .16rem; flex-wrap: wrap; max-width: 8rem; min-height: .7rem; margin-top: .1rem; }
+.area-icons i { display: inline-flex; gap: .14rem; align-items: center; padding: .1rem .2rem; color: #17231f; background: rgba(244, 233, 202, .91); border: 1px solid rgba(66, 53, 34, .42); border-radius: 2px; box-shadow: 0 1px 3px rgba(4, 16, 16, .3); font-size: .44rem; font-style: normal; font-weight: 900; line-height: 1; text-shadow: none; white-space: nowrap; }
+.area-icons i b { font-weight: 900; }
+.area-icons i span { min-width: .5rem; padding-left: .12rem; border-left: 1px solid rgba(69, 55, 34, .3); text-align: center; }
+.area-icons .neutral { color: #7e1f24; background: rgba(255, 226, 211, .94); border-color: rgba(133, 47, 40, .5); }
+.area-icons .garrison { color: #402d1b; background: rgba(237, 220, 181, .94); }
+.area-icons .blocked { color: #7a2927; background: rgba(255, 222, 216, .94); border-color: rgba(135, 45, 42, .5); }
 .area-units { display: flex; gap: .22rem; flex-wrap: wrap; max-width: 5rem; margin-top: .12rem; }
 .map-unit-piece {
   --unit-color: #667;
