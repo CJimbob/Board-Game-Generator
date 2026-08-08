@@ -590,6 +590,21 @@
 .realm-modal article > section h3 { margin: 0 0 .3rem; font: 900 .9rem "Songti SC", STSong, Georgia, serif; }
 .realm-modal article > section p { margin: 0; color: #655f54; font-size: .69rem; line-height: 1.65; }
 
+@media (min-width: 1121px) {
+  .realm-table { height: 100vh; display: grid; grid-template-rows: auto minmax(0, 1fr); overflow: hidden; padding-bottom: 0; }
+  .realm-main-grid { min-height: 0; height: 100%; }
+  .realm-board-column { min-height: 0; display: grid; grid-template-rows: auto minmax(0, 1fr); overflow: hidden; }
+  .realm-track-overview > header { min-height: 2.7rem; padding: .4rem .65rem 0; }
+  .realm-track-overview .board-tracks { gap: .4rem; padding: .5rem .65rem; overflow: hidden; }
+  .realm-track-overview .board-tracks .number-track { grid-template-columns: repeat(auto-fit, minmax(1.15rem, 1fr)); }
+  .realm-track-overview .board-influence ol { grid-template-columns: repeat(6, minmax(1.35rem, 1fr)); }
+  .realm-track-overview .board-influence li { justify-content: center; padding: 0 .2rem; }
+  .realm-map-wrap { min-height: 0; height: 100%; }
+  .realm-map-shell { height: 100%; display: grid; grid-template-rows: auto minmax(0, 1fr) auto; overflow: hidden; }
+  .realm-map-viewport { height: auto; min-height: 0; }
+  .realm-below-map { position: static; top: auto; height: 100%; max-height: none; }
+}
+
 @media (min-width: 821px) and (max-width: 1120px) {
   .realm-main-grid { grid-template-columns: 1fr; gap: .65rem; padding: .65rem; }
   .realm-below-map { position: static; max-height: none; display: grid; grid-template-columns: minmax(0, 1fr) minmax(22rem, 28rem); overflow: visible; padding-right: 0; }
