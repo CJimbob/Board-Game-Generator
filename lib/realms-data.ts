@@ -21,6 +21,20 @@ export type RealmFactionDefinition = {
   startingInfluence: [number, number, number];
 };
 
+export type RealmStartingUnit = {
+  faction: string;
+  area: string;
+  type: RealmUnitType;
+  quantity?: number;
+};
+
+export type RealmSetupDefinition = {
+  factions: string[];
+  blocked: string[];
+  neutralForces: Record<string, number>;
+  removedStartingAreas: string[];
+};
+
 export type RealmAreaDefinition = {
   key: string;
   name: string;
@@ -65,53 +79,109 @@ export type RealmLeaderCard = {
 
 export const REALM_FACTIONS: RealmFactionDefinition[] = [
   { key: "frost", name: "北辰盟约", nameEn: "Frostbound Pact", motto: "群峰记得每一次誓言", mottoEn: "The peaks remember every oath", color: "#6f91b7", home: "northhold", port: "north_port", startingSupply: 1, startingInfluence: [3, 4, 2] },
-  { key: "umbral", name: "玄羽议会", nameEn: "Umbral Conclave", motto: "真相藏在最后一封信里", mottoEn: "Truth waits in the final letter", color: "#67547d", home: "shadow_fort", port: "shadow_port", startingSupply: 2, startingInfluence: [5, 1, 3] },
+  { key: "umbral", name: "玄羽议会", nameEn: "Umbral Conclave", motto: "真相藏在最后一封信里", mottoEn: "Truth waits in the final letter", color: "#67547d", home: "shadow_fort", port: "shadow_port", startingSupply: 2, startingInfluence: [2, 6, 1] },
   { key: "sunward", name: "曜金议庭", nameEn: "Sunward Council", motto: "财富只服从耐心", mottoEn: "Fortune bends to patience", color: "#c59a42", home: "goldhaven", port: "gold_port", startingSupply: 2, startingInfluence: [1, 5, 4] },
-  { key: "verdant", name: "绿冠王庭", nameEn: "Verdant Court", motto: "花开之后仍有利刃", mottoEn: "A blade remains after the bloom", color: "#5e8a62", home: "highgarden", port: "green_port", startingSupply: 2, startingInfluence: [4, 3, 1] },
-  { key: "redmarch", name: "赤岭军府", nameEn: "Redmarch Host", motto: "城墙终会向火焰低头", mottoEn: "Every wall bows to flame", color: "#a84f47", home: "ember_keep", port: "ember_port", startingSupply: 1, startingInfluence: [2, 2, 6] },
-  { key: "tide", name: "苍潮联邦", nameEn: "Tideborne League", motto: "潮汐不承认边界", mottoEn: "The tide recognizes no border", color: "#3f8792", home: "tidewatch", port: "tide_port", startingSupply: 1, startingInfluence: [6, 6, 5] },
+  { key: "verdant", name: "绿冠王庭", nameEn: "Verdant Court", motto: "花开之后仍有利刃", mottoEn: "A blade remains after the bloom", color: "#5e8a62", home: "highgarden", port: "old_port", startingSupply: 2, startingInfluence: [6, 2, 5] },
+  { key: "redmarch", name: "赤岭军府", nameEn: "Redmarch Host", motto: "城墙终会向火焰低头", mottoEn: "Every wall bows to flame", color: "#a84f47", home: "ember_keep", port: "ember_port", startingSupply: 2, startingInfluence: [4, 3, 3] },
+  { key: "tide", name: "苍潮联邦", nameEn: "Tideborne League", motto: "潮汐不承认边界", mottoEn: "The tide recognizes no border", color: "#3f8792", home: "tidewatch", port: "tide_port", startingSupply: 2, startingInfluence: [5, 1, 6] },
 ];
 
 export const REALM_AREAS: RealmAreaDefinition[] = [
-  { key: "northhold", name: "北辰堡", nameEn: "Northhold", kind: "land", x: 47, y: 9, castle: 2, supply: 1, homeOf: "frost", garrison: 2, adjacent: ["frozen_pass", "wolfwood", "crown_road", "north_port"] },
-  { key: "frozen_pass", name: "霜隘", nameEn: "Frost Pass", kind: "land", x: 27, y: 11, supply: 1, adjacent: ["northhold", "ice_coast", "high_peaks"] },
-  { key: "high_peaks", name: "高峰谷", nameEn: "High Peaks", kind: "land", x: 17, y: 21, power: 1, adjacent: ["frozen_pass", "ice_coast", "shadow_fort"] },
-  { key: "ice_coast", name: "冰湾岸", nameEn: "Icebay Coast", kind: "land", x: 31, y: 27, castle: 1, adjacent: ["frozen_pass", "high_peaks", "wolfwood", "shadow_fort", "frozen_sea"] },
-  { key: "wolfwood", name: "狼林", nameEn: "Wolfwood", kind: "land", x: 48, y: 22, supply: 1, adjacent: ["northhold", "ice_coast", "crown_road", "riverwatch"] },
-  { key: "crown_road", name: "王冠大道", nameEn: "Crown Road", kind: "land", x: 63, y: 23, power: 1, adjacent: ["northhold", "wolfwood", "riverwatch", "central_plains", "moon_gate"] },
-  { key: "shadow_fort", name: "玄羽堡", nameEn: "Shadow Fort", kind: "land", x: 15, y: 36, castle: 2, supply: 1, homeOf: "umbral", garrison: 2, adjacent: ["high_peaks", "ice_coast", "riverwatch", "west_hills", "shadow_port"] },
-  { key: "riverwatch", name: "河望城", nameEn: "Riverwatch", kind: "land", x: 33, y: 36, castle: 1, supply: 1, adjacent: ["ice_coast", "wolfwood", "crown_road", "shadow_fort", "west_hills", "central_plains"] },
-  { key: "west_hills", name: "西丘", nameEn: "Western Hills", kind: "land", x: 23, y: 49, supply: 1, adjacent: ["shadow_fort", "riverwatch", "goldhaven", "central_plains"] },
-  { key: "moon_gate", name: "月门", nameEn: "Moon Gate", kind: "land", x: 77, y: 31, castle: 1, supply: 1, adjacent: ["crown_road", "central_plains", "throne_city", "east_hills", "tidewatch"] },
-  { key: "goldhaven", name: "曜金港", nameEn: "Goldhaven", kind: "land", x: 12, y: 62, castle: 2, supply: 1, homeOf: "sunward", garrison: 2, adjacent: ["west_hills", "central_plains", "sunfield", "gold_port"] },
-  { key: "central_plains", name: "群王原", nameEn: "Kingsplain", kind: "land", x: 50, y: 46, castle: 1, power: 1, adjacent: ["crown_road", "riverwatch", "west_hills", "goldhaven", "sunfield", "highgarden", "throne_city", "moon_gate"] },
-  { key: "throne_city", name: "苍穹王城", nameEn: "Skyhold", kind: "land", x: 69, y: 49, castle: 2, power: 2, garrison: 5, neutral: 6, adjacent: ["central_plains", "moon_gate", "lower_river", "stormlands", "central_strait"] },
-  { key: "sunfield", name: "日照原", nameEn: "Sunfield", kind: "land", x: 34, y: 62, supply: 1, adjacent: ["goldhaven", "central_plains", "highgarden", "red_desert"] },
-  { key: "highgarden", name: "绿冠庭", nameEn: "Green Crown", kind: "land", x: 38, y: 76, castle: 2, supply: 1, homeOf: "verdant", garrison: 2, adjacent: ["central_plains", "sunfield", "red_desert", "lower_river", "green_port"] },
-  { key: "red_desert", name: "赤沙庭", nameEn: "Red Sands", kind: "land", x: 18, y: 79, supply: 1, power: 1, adjacent: ["sunfield", "highgarden", "lower_river", "southern_sea"] },
-  { key: "lower_river", name: "下河口", nameEn: "Lower River", kind: "land", x: 56, y: 68, castle: 1, adjacent: ["highgarden", "red_desert", "throne_city", "stormlands", "ember_keep"] },
-  { key: "stormlands", name: "风暴原", nameEn: "Stormlands", kind: "land", x: 76, y: 65, castle: 1, power: 1, adjacent: ["throne_city", "lower_river", "moon_gate", "east_hills", "ember_keep", "tidewatch"] },
-  { key: "east_hills", name: "东岭", nameEn: "Eastern Ridges", kind: "land", x: 87, y: 47, supply: 1, adjacent: ["moon_gate", "stormlands", "ember_keep", "tidewatch"] },
-  { key: "ember_keep", name: "赤岭堡", nameEn: "Ember Keep", kind: "land", x: 61, y: 82, castle: 2, supply: 1, homeOf: "redmarch", garrison: 2, adjacent: ["lower_river", "stormlands", "east_hills", "red_steppe", "ember_port"] },
-  { key: "red_steppe", name: "红石荒原", nameEn: "Red Steppe", kind: "land", x: 84, y: 82, supply: 1, adjacent: ["ember_keep", "east_hills", "salt_marsh", "ember_sea"] },
-  { key: "tidewatch", name: "苍潮城", nameEn: "Tidewatch", kind: "land", x: 94, y: 37, castle: 2, supply: 1, homeOf: "tide", garrison: 2, adjacent: ["moon_gate", "east_hills", "stormlands", "salt_marsh", "tide_port"] },
-  { key: "salt_marsh", name: "盐泽", nameEn: "Salt Marsh", kind: "land", x: 93, y: 64, supply: 1, power: 1, adjacent: ["tidewatch", "red_steppe", "eastern_sea"] },
-  { key: "glass_isle", name: "琉璃岛", nameEn: "Glass Isle", kind: "land", x: 9, y: 80, castle: 1, supply: 1, neutral: 3, adjacent: ["western_sea", "golden_bay", "southern_sea"] },
+  { key: "crown_lowlands", name: "王畿泽", nameEn: "Crown Lowlands", kind: "land", x: 35.1, y: 64.1, supply: 2, adjacent: ["claw_point", "ashen_hall", "throne_city", "coastroad", "stone_sept", "central_plains"] },
+  { key: "throne_city", name: "苍穹王城", nameEn: "Skyhold", kind: "land", x: 52.5, y: 65.2, castle: 2, power: 2, garrison: 5, neutral: 5, adjacent: ["crown_lowlands", "crown_bay", "claw_point", "crownwood", "central_plains"] },
+  { key: "central_plains", name: "群王原", nameEn: "Kingsplain", kind: "land", x: 38.8, y: 72.5, castle: 1, adjacent: ["crown_lowlands", "ember_march", "highgarden", "throne_city", "crownwood", "coastroad", "bone_road"] },
+  { key: "crownwood", name: "王冠林", nameEn: "Crownwood", kind: "land", x: 61.5, y: 67.8, supply: 1, power: 1, adjacent: ["crown_bay", "throne_city", "storm_bay", "stormhold", "bone_road", "central_plains"] },
+  { key: "crown_bay", name: "王城湾", nameEn: "Crown Bay", kind: "sea", x: 61.3, y: 61.2, adjacent: ["claw_point", "throne_city", "crownwood", "storm_bay"] },
+  { key: "claw_point", name: "鹰爪岬", nameEn: "Claw Point", kind: "land", x: 52.4, y: 57.9, castle: 1, adjacent: ["crown_lowlands", "crown_bay", "ashen_hall", "throne_city", "storm_bay", "moon_mountains", "narrow_sea"] },
+  { key: "ashen_hall", name: "灰烬厅", nameEn: "Ashen Hall", kind: "land", x: 42.6, y: 54.5, castle: 1, power: 1, adjacent: ["crown_lowlands", "claw_point", "riverwatch", "stone_sept"] },
+  { key: "stone_sept", name: "石堂镇", nameEn: "Stone Sept", kind: "land", x: 32.7, y: 56.6, power: 1, adjacent: ["crown_lowlands", "ashen_hall", "shadow_fort", "riverwatch", "coastroad"] },
+  { key: "riverwatch", name: "河望城", nameEn: "Riverwatch", kind: "land", x: 33.4, y: 50.2, castle: 2, supply: 1, power: 1, adjacent: ["ashen_hall", "iron_bay", "shadow_fort", "seagate", "stone_sept", "gilded_sound"] },
+  { key: "shadow_fort", name: "玄羽堡", nameEn: "Shadow Fort", kind: "land", x: 23, y: 52.2, castle: 2, supply: 2, homeOf: "umbral", garrison: 2, adjacent: ["shadow_port", "riverwatch", "coastroad", "stone_sept", "gilded_sound"] },
+  { key: "tidewatch", name: "苍潮城", nameEn: "Tidewatch", kind: "land", x: 9.6, y: 42.4, castle: 2, supply: 1, power: 1, homeOf: "tide", garrison: 2, adjacent: ["iron_bay", "tide_port"] },
+  { key: "iron_bay", name: "铁民湾", nameEn: "Iron Bay", kind: "sea", x: 14, y: 39.4, adjacent: ["flint_cape", "greyfen", "tide_port", "tidewatch", "riverwatch", "seagate", "sunset_sea", "gilded_sound"] },
+  { key: "gilded_sound", name: "鎏金海峡", nameEn: "Gilded Sound", kind: "sea", x: 6, y: 60.8, adjacent: ["iron_bay", "shadow_fort", "shadow_port", "riverwatch", "coastroad", "sunset_sea"] },
+  { key: "tide_port", name: "苍潮港", nameEn: "Tidewatch Port", kind: "port", x: 19.2, y: 42.3, portOf: "tidewatch", seaOf: "iron_bay", adjacent: ["iron_bay", "tidewatch"] },
+  { key: "shadow_port", name: "玄羽港", nameEn: "Shadow Port", kind: "port", x: 15.4, y: 55.7, portOf: "shadow_fort", seaOf: "gilded_sound", adjacent: ["shadow_fort", "gilded_sound"] },
+  { key: "seagate", name: "海门城", nameEn: "Seagate", kind: "land", x: 26.8, y: 39.6, castle: 2, supply: 1, power: 1, adjacent: ["greyfen", "iron_bay", "reedgate", "riverwatch", "twin_ford"] },
+  { key: "sunset_sea", name: "落日海", nameEn: "Sunset Sea", kind: "sea", x: 4.4, y: 33.9, adjacent: ["ice_bay", "flint_cape", "iron_bay", "coastroad", "gilded_sound", "southern_sea"] },
+  { key: "flint_cape", name: "燧石岬", nameEn: "Flint Cape", kind: "land", x: 18.3, y: 34.5, castle: 1, adjacent: ["ice_bay", "greyfen", "iron_bay", "sunset_sea"] },
+  { key: "greyfen", name: "灰水泽", nameEn: "Greyfen", kind: "land", x: 27.1, y: 33.1, supply: 1, adjacent: ["ice_bay", "flint_cape", "iron_bay", "reedgate", "seagate"] },
+  { key: "coastroad", name: "海岸行军道", nameEn: "Coastroad March", kind: "land", x: 19.6, y: 63.5, supply: 1, adjacent: ["crown_lowlands", "highgarden", "shadow_fort", "stone_sept", "sunset_sea", "gilded_sound", "central_plains", "southern_sea"] },
+  { key: "ice_bay", name: "冰霜湾", nameEn: "Bay of Frost", kind: "sea", x: 4.3, y: 6.8, adjacent: ["frostwall", "flint_cape", "greyfen", "north_port", "sunset_sea", "stone_coast", "northhold"] },
+  { key: "frostwall", name: "霜墙", nameEn: "Frostwall", kind: "land", x: 47.8, y: 1.7, power: 1, adjacent: ["ice_bay", "karpeak", "shivering_sea", "northhold"] },
+  { key: "karpeak", name: "卡尔峰", nameEn: "Karpeak", kind: "land", x: 58.8, y: 7.8, power: 1, adjacent: ["frostwall", "shivering_sea", "northhold"] },
+  { key: "northhold", name: "北辰堡", nameEn: "Northhold", kind: "land", x: 32.2, y: 16.8, castle: 2, supply: 1, power: 1, homeOf: "frost", garrison: 2, adjacent: ["ice_bay", "frostwall", "karpeak", "reedgate", "north_port", "shivering_sea", "stone_coast", "white_harbor"] },
+  { key: "north_port", name: "北辰港", nameEn: "Northhold Port", kind: "port", x: 22.2, y: 10.7, portOf: "northhold", seaOf: "ice_bay", adjacent: ["ice_bay", "northhold"] },
+  { key: "stone_coast", name: "岩砾海岸", nameEn: "Stony Coast", kind: "land", x: 18.7, y: 20.5, supply: 1, adjacent: ["ice_bay", "northhold"] },
+  { key: "white_harbor", name: "白帆港", nameEn: "White Harbor", kind: "land", x: 48.8, y: 20.2, castle: 1, adjacent: ["reedgate", "white_port", "narrow_sea", "shivering_sea", "widow_watch", "northhold"] },
+  { key: "widow_watch", name: "寡妇望", nameEn: "Widow Watch", kind: "land", x: 57.8, y: 23.3, supply: 1, adjacent: ["narrow_sea", "shivering_sea", "white_harbor"] },
+  { key: "shivering_sea", name: "战栗海", nameEn: "Shivering Sea", kind: "sea", x: 74.2, y: 20, adjacent: ["frostwall", "karpeak", "narrow_sea", "white_harbor", "widow_watch", "northhold"] },
+  { key: "reedgate", name: "苇泽关", nameEn: "Reedgate", kind: "land", x: 36, y: 34.5, castle: 1, adjacent: ["greyfen", "seagate", "narrow_sea", "twin_ford", "white_harbor", "northhold"] },
+  { key: "white_port", name: "白帆外港", nameEn: "White Harbor Port", kind: "port", x: 49.2, y: 31.3, portOf: "white_harbor", seaOf: "narrow_sea", adjacent: ["narrow_sea", "white_harbor"] },
+  { key: "narrow_sea", name: "狭长海", nameEn: "Narrow Sea", kind: "sea", x: 74.4, y: 31.3, adjacent: ["claw_point", "reedgate", "white_port", "storm_bay", "eagle_nest", "east_fingers", "moon_mountains", "shivering_sea", "twin_ford", "white_harbor", "widow_watch"] },
+  { key: "east_fingers", name: "东指半岛", nameEn: "Eastern Fingers", kind: "land", x: 55, y: 38.8, supply: 1, adjacent: ["moon_mountains", "narrow_sea", "twin_ford"] },
+  { key: "twin_ford", name: "双子渡", nameEn: "Twin Ford", kind: "land", x: 40.5, y: 41.3, power: 1, adjacent: ["reedgate", "seagate", "east_fingers", "moon_mountains", "narrow_sea"] },
+  { key: "moon_mountains", name: "月脊群山", nameEn: "Moon Mountains", kind: "land", x: 49.6, y: 45.3, supply: 1, adjacent: ["claw_point", "eagle_nest", "east_fingers", "narrow_sea", "twin_ford"] },
+  { key: "eagle_nest", name: "鹰巢天险", nameEn: "Eagle's Eyrie", kind: "land", x: 60.4, y: 50.2, castle: 1, supply: 1, power: 1, garrison: 6, neutral: 6, adjacent: ["moon_mountains", "narrow_sea"] },
+  { key: "storm_bay", name: "碎舰湾", nameEn: "Stormbreak Bay", kind: "sea", x: 74.3, y: 67.9, adjacent: ["crown_bay", "claw_point", "goldhaven", "eastern_summer", "crownwood", "gold_port", "storm_port", "stormhold", "narrow_sea"] },
+  { key: "goldhaven", name: "曜金岛", nameEn: "Goldhaven", kind: "land", x: 74.7, y: 54.5, castle: 2, supply: 1, power: 1, homeOf: "sunward", garrison: 2, adjacent: ["gold_port", "storm_bay"] },
+  { key: "gold_port", name: "曜金港", nameEn: "Goldhaven Port", kind: "port", x: 75, y: 62.4, portOf: "goldhaven", seaOf: "storm_bay", adjacent: ["goldhaven", "storm_bay"] },
+  { key: "ember_port", name: "赤岭港", nameEn: "Ember Port", kind: "port", x: 72.1, y: 88.9, portOf: "ember_keep", seaOf: "eastern_summer", adjacent: ["eastern_summer", "ember_keep"] },
+  { key: "ember_keep", name: "赤岭堡", nameEn: "Ember Keep", kind: "land", x: 62.1, y: 86.1, castle: 2, supply: 1, power: 1, homeOf: "redmarch", garrison: 2, adjacent: ["eastern_summer", "ember_port", "salt_shore", "ember_sea", "ironwood"] },
+  { key: "ember_sea", name: "余烬海", nameEn: "Ember Sea", kind: "sea", x: 55.3, y: 82.8, adjacent: ["eastern_summer", "stormhold", "ember_keep", "bone_road", "ironwood"] },
+  { key: "eastern_summer", name: "东暖海", nameEn: "Eastern Summer Sea", kind: "sea", x: 59.5, y: 97.3, adjacent: ["ember_port", "salt_shore", "ember_sea", "storm_bay", "duskfall", "stormhold", "ember_keep", "southern_sea"] },
+  { key: "salt_shore", name: "盐岸", nameEn: "Salt Shore", kind: "land", x: 51.1, y: 90.1, supply: 1, adjacent: ["eastern_summer", "duskfall", "ember_keep", "ironwood"] },
+  { key: "stormhold", name: "风暴堡", nameEn: "Stormhold", kind: "land", x: 57.5, y: 77.2, castle: 1, adjacent: ["eastern_summer", "crownwood", "storm_port", "ember_sea", "storm_bay", "bone_road"] },
+  { key: "storm_port", name: "风暴港", nameEn: "Stormhold Port", kind: "port", x: 63.4, y: 75.1, portOf: "stormhold", seaOf: "storm_bay", adjacent: ["storm_bay", "stormhold"] },
+  { key: "bone_road", name: "白骨道", nameEn: "Bone Road", kind: "land", x: 48.5, y: 77.8, power: 1, adjacent: ["ember_march", "crownwood", "red_pass", "ember_sea", "stormhold", "central_plains", "ironwood"] },
+  { key: "red_pass", name: "赤焰隘", nameEn: "Red Pass", kind: "land", x: 34.1, y: 81, supply: 1, power: 1, adjacent: ["ember_march", "duskfall", "bone_road", "triarch_towers", "ironwood"] },
+  { key: "ironwood", name: "铁木谷", nameEn: "Ironwood", kind: "land", x: 39.4, y: 86.7, castle: 1, adjacent: ["red_pass", "salt_shore", "ember_sea", "duskfall", "ember_keep", "bone_road"] },
+  { key: "triarch_towers", name: "三贤塔", nameEn: "Triarch Towers", kind: "land", x: 24, y: 84.9, supply: 1, adjacent: ["ember_march", "old_tower", "red_pass", "green_straits", "southern_sea"] },
+  { key: "duskfall", name: "暮星城", nameEn: "Duskfall", kind: "land", x: 31.4, y: 92, castle: 1, supply: 1, adjacent: ["eastern_summer", "red_pass", "salt_shore", "southern_sea", "ironwood"] },
+  { key: "glass_isle", name: "琉璃岛", nameEn: "Glass Isle", kind: "land", x: 7.2, y: 92.8, power: 1, adjacent: ["green_straits", "southern_sea"] },
+  { key: "southern_sea", name: "西暖海", nameEn: "Western Summer Sea", kind: "sea", x: 24, y: 97.2, adjacent: ["eastern_summer", "highgarden", "green_straits", "coastroad", "duskfall", "sunset_sea", "glass_isle", "triarch_towers"] },
+  { key: "green_straits", name: "青藤海峡", nameEn: "Verdant Straits", kind: "sea", x: 8.9, y: 88.5, adjacent: ["highgarden", "old_tower", "old_port", "glass_isle", "triarch_towers", "southern_sea"] },
+  { key: "old_port", name: "古塔港", nameEn: "Old Tower Port", kind: "port", x: 10.6, y: 80.2, portOf: "old_tower", seaOf: "green_straits", adjacent: ["old_tower", "green_straits"] },
+  { key: "old_tower", name: "古塔城", nameEn: "Old Tower", kind: "land", x: 18.4, y: 80.4, castle: 2, adjacent: ["ember_march", "highgarden", "old_port", "green_straits", "triarch_towers"] },
+  { key: "highgarden", name: "绿冠庭", nameEn: "Green Crown", kind: "land", x: 17.8, y: 70.9, castle: 2, supply: 2, homeOf: "verdant", garrison: 2, adjacent: ["ember_march", "old_tower", "green_straits", "coastroad", "central_plains", "southern_sea"] },
+  { key: "ember_march", name: "焰边行省", nameEn: "Ember Marches", kind: "land", x: 33.4, y: 76.8, power: 1, adjacent: ["highgarden", "old_tower", "red_pass", "bone_road", "central_plains", "triarch_towers"] },
+];
 
-  { key: "frozen_sea", name: "冻海", nameEn: "Frozen Sea", kind: "sea", x: 82, y: 9, adjacent: ["ice_coast", "north_port", "western_sea", "central_strait", "eastern_sea"] },
-  { key: "western_sea", name: "西境海", nameEn: "Western Sea", kind: "sea", x: 4, y: 35, adjacent: ["frozen_sea", "shadow_port", "gold_port", "golden_bay", "glass_isle"] },
-  { key: "golden_bay", name: "金色海湾", nameEn: "Golden Bay", kind: "sea", x: 3, y: 62, adjacent: ["western_sea", "gold_port", "glass_isle", "southern_sea"] },
-  { key: "southern_sea", name: "南境海", nameEn: "Southern Sea", kind: "sea", x: 35, y: 94, adjacent: ["golden_bay", "glass_isle", "red_desert", "green_port", "ember_sea"] },
-  { key: "ember_sea", name: "余烬海", nameEn: "Ember Sea", kind: "sea", x: 82, y: 96, adjacent: ["southern_sea", "green_port", "ember_port", "red_steppe", "eastern_sea", "central_strait"] },
-  { key: "eastern_sea", name: "东境海", nameEn: "Eastern Sea", kind: "sea", x: 98, y: 50, adjacent: ["frozen_sea", "tide_port", "salt_marsh", "ember_sea", "central_strait"] },
-  { key: "central_strait", name: "王城海峡", nameEn: "Crown Strait", kind: "sea", x: 78, y: 46, adjacent: ["frozen_sea", "eastern_sea", "ember_sea", "throne_city"] },
+export const REALM_PLAYER_SETUPS: Record<number, RealmSetupDefinition> = {
+  3: {
+    factions: ["sunward", "umbral", "frost"],
+    blocked: ["tidewatch", "tide_port", "highgarden", "old_tower", "old_port", "ember_keep", "ember_port", "salt_shore", "ironwood", "duskfall", "triarch_towers", "ember_march", "red_pass", "bone_road", "stormhold", "storm_port"],
+    neutralForces: {},
+    removedStartingAreas: ["shadow_port"],
+  },
+  4: {
+    factions: ["sunward", "umbral", "frost", "tide"],
+    blocked: [],
+    neutralForces: { old_tower: 3, triarch_towers: 3, ember_march: 3, red_pass: 3, duskfall: 3, ironwood: 3, bone_road: 3, stormhold: 4, salt_shore: 3, ember_keep: 5 },
+    removedStartingAreas: [],
+  },
+  5: {
+    factions: ["sunward", "umbral", "frost", "tide", "verdant"],
+    blocked: [],
+    neutralForces: { triarch_towers: 3, red_pass: 3, bone_road: 3, duskfall: 3, ironwood: 3, salt_shore: 3, ember_keep: 5 },
+    removedStartingAreas: [],
+  },
+  6: { factions: ["frost", "tide", "umbral", "sunward", "verdant", "redmarch"], blocked: [], neutralForces: {}, removedStartingAreas: [] },
+};
 
-  { key: "north_port", name: "北辰港", nameEn: "Northhold Port", kind: "port", x: 58, y: 11, portOf: "northhold", seaOf: "frozen_sea", adjacent: ["northhold", "frozen_sea"] },
-  { key: "shadow_port", name: "玄羽港", nameEn: "Shadow Port", kind: "port", x: 8, y: 34, portOf: "shadow_fort", seaOf: "western_sea", adjacent: ["shadow_fort", "western_sea"] },
-  { key: "gold_port", name: "曜金港湾", nameEn: "Goldhaven Port", kind: "port", x: 7, y: 59, portOf: "goldhaven", seaOf: "golden_bay", adjacent: ["goldhaven", "golden_bay"] },
-  { key: "green_port", name: "绿冠港", nameEn: "Green Crown Port", kind: "port", x: 42, y: 85, portOf: "highgarden", seaOf: "southern_sea", adjacent: ["highgarden", "southern_sea"] },
-  { key: "ember_port", name: "赤岭港", nameEn: "Ember Port", kind: "port", x: 70, y: 89, portOf: "ember_keep", seaOf: "ember_sea", adjacent: ["ember_keep", "ember_sea"] },
-  { key: "tide_port", name: "苍潮港", nameEn: "Tidewatch Port", kind: "port", x: 96, y: 40, portOf: "tidewatch", seaOf: "eastern_sea", adjacent: ["tidewatch", "eastern_sea"] },
+export const REALM_STARTING_UNITS: RealmStartingUnit[] = [
+  { faction: "frost", area: "northhold", type: "footman" }, { faction: "frost", area: "northhold", type: "knight" },
+  { faction: "frost", area: "white_harbor", type: "footman" }, { faction: "frost", area: "shivering_sea", type: "ship" },
+  { faction: "tide", area: "tidewatch", type: "footman" }, { faction: "tide", area: "tidewatch", type: "knight" },
+  { faction: "tide", area: "tide_port", type: "ship" }, { faction: "tide", area: "iron_bay", type: "ship" }, { faction: "tide", area: "greyfen", type: "footman" },
+  { faction: "umbral", area: "shadow_fort", type: "footman" }, { faction: "umbral", area: "shadow_fort", type: "knight" },
+  { faction: "umbral", area: "shadow_port", type: "ship" }, { faction: "umbral", area: "gilded_sound", type: "ship" }, { faction: "umbral", area: "stone_sept", type: "footman" },
+  { faction: "sunward", area: "goldhaven", type: "footman" }, { faction: "sunward", area: "goldhaven", type: "knight" },
+  { faction: "sunward", area: "storm_bay", type: "ship", quantity: 2 }, { faction: "sunward", area: "crownwood", type: "footman" },
+  { faction: "verdant", area: "highgarden", type: "footman" }, { faction: "verdant", area: "highgarden", type: "knight" },
+  { faction: "verdant", area: "green_straits", type: "ship" }, { faction: "verdant", area: "ember_march", type: "footman" },
+  { faction: "redmarch", area: "ember_keep", type: "footman" }, { faction: "redmarch", area: "ember_keep", type: "knight" },
+  { faction: "redmarch", area: "ember_sea", type: "ship" }, { faction: "redmarch", area: "salt_shore", type: "footman" },
 ];
 
 const card = (

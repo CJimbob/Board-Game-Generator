@@ -14,6 +14,7 @@ import {
   publicRealmView,
   removeRealmPlayer,
   resolveRealmConsolidate,
+  resolveRealmCombatEffect,
   resolveRealmMarch,
   resolveRealmRaid,
   startRealmGame,
@@ -64,6 +65,7 @@ type Body = {
   unitIds?: string[];
   musterChoices?: RealmMusterChoice[];
   event?: RealmEventKey;
+  option?: string;
   amount?: number;
   faction?: string;
 };
@@ -101,6 +103,7 @@ function credentials(request: NextRequest, body?: Body) {
 function requireRealm(record: Awaited<ReturnType<typeof loadRoomRecord<RealmState>>>) {
   if (!record) throw new Error("没有找到这个六境房间，房间可能已超过七天未活动。 ");
   if (record.state.kind !== "realms") throw new Error("这个房间属于另一款游戏。 ");
+  if (record.state.rulesVersion !== 2) throw new Error("这局使用旧版测试地图，无法混用新版规则；请创建一局新的六境战争。 ");
   return record;
 }
 
@@ -215,6 +218,7 @@ export async function POST(request: NextRequest) {
       case "casualties": chooseRealmCasualties(state, player.id, body.unitIds ?? []); break;
       case "retreat": chooseRealmRetreat(state, player.id, body.areaId ?? ""); break;
       case "consolidate": resolveRealmConsolidate(state, player.id, body.areaId ?? "", body.mode === "muster" ? "muster" : "power", body.musterChoices ?? []); break;
+      case "combatEffect": resolveRealmCombatEffect(state, player.id, body.option); break;
       case "eventChoice": chooseRealmEvent(state, player.id, body.event!); break;
       case "supply": submitRealmSupplyLosses(state, player.id, body.unitIds ?? []); break;
       case "muster": submitRealmMuster(state, player.id, body.musterChoices ?? []); break;

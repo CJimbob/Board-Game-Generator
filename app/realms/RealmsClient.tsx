@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useCallback, useEffect, useRef, useState, type CSSProperties } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
 
 type Language = "zh" | "en";
 type Session = { code: string; playerId: string; token: string; recoveryCode?: string };
@@ -32,7 +32,7 @@ type Game = {
   viewerId: string;
   currentPlayerId: string | null;
   players: Player[];
-  areas: Record<string, { units: Unit[]; control: string | null; controlToken: boolean; order: Order | "hidden" | null; neutral: number | null; garrison: number | null }>;
+  areas: Record<string, { units: Unit[]; control: string | null; controlToken: boolean; order: Order | "hidden" | null; neutral: number | null; garrison: number | null; blocked: boolean }>;
   influence: { throne: string[]; fiefdom: string[]; court: string[] };
   bladeUsed: boolean;
   ravenUsed: boolean;
@@ -46,6 +46,7 @@ type Game = {
   supplyQueue: string[];
   musterQueue: string[];
   pendingCombat: Combat | null;
+  combatEffect: { actorFaction: string; targetFaction: string; type: "remove_adjacent_order" | "move_influence_bottom" | "discard_enemy_card" | "remove_order" | "upgrade_unit"; options: string[]; optional: boolean } | null;
   tidesOfBattle: boolean;
   winnerId: string | null;
   log: string[];
@@ -70,7 +71,7 @@ const PHASE_LABELS: Record<string, [string, string]> = {
   supply: ["补给调整", "Supply adjustment"], mustering: ["全国征召", "Mustering"], influence_bid: ["影响力竞价", "Influence bidding"], wildling_bid: ["荒境入侵", "Frontier attack"],
   bid_tiebreak: ["王座裁决平手", "Throne tie-break"],
   planning: ["秘密下令", "Secret planning"], raven: ["信鸦调整", "Raven adjustment"], raid: ["结算突袭", "Resolve raids"], march: ["结算行军", "Resolve marches"],
-  combat_support: ["宣布支援", "Declare support"], combat_cards: ["选择领袖", "Choose leader"], combat_blade: ["钢剑裁决", "Steel blade"], combat_casualties: ["选择伤亡", "Choose casualties"], combat_retreat: ["败军撤退", "Retreat"],
+  combat_support: ["宣布支援", "Declare support"], combat_cards: ["选择领袖", "Choose leader"], combat_blade: ["钢剑裁决", "Steel blade"], combat_effect: ["结算领袖能力", "Resolve leader ability"], combat_casualties: ["选择伤亡", "Choose casualties"], combat_retreat: ["败军撤退", "Retreat"],
   consolidate: ["结算集权", "Resolve consolidation"], finished: ["六境归一", "Realm united"],
 };
 const UNIT_LABELS: Record<Unit["type"], [string, string, string]> = {
@@ -200,7 +201,7 @@ function RealmTable({ game, session, language, act, busy, error, onRules, onLang
     <header className="realm-header"><div><Link href="/realms" className="realm-brand">✦ {text("六境争霸", "The Six Realms")}</Link><span>{text(`房间 ${game.code}`, `Room ${game.code}`)}</span><span>{text(`第 ${game.round}/10 轮`, `Round ${game.round}/10`)}</span></div><div>{game.viewerId !== game.hostId && host && !host.isBot && !host.isOnline && <button onClick={() => act("claimHost")}>{text("接任房主", "Take host")}</button>}<button onClick={() => navigator.clipboard.writeText(`${window.location.origin}/realms?room=${game.code}`)}>{text("复制邀请", "Copy invite")}</button>{session.recoveryCode && <button onClick={() => navigator.clipboard.writeText(session.recoveryCode!)}>{text(`恢复码 ${session.recoveryCode}`, `Recovery ${session.recoveryCode}`)}</button>}<button onClick={onLanguage}>{language === "zh" ? "EN" : "中文"}</button><button onClick={onRules}>{text("规则书", "Rules")}</button></div></header>
     <section className="realm-phase"><div><small>{text("当前阶段", "Current phase")}</small><strong>{(PHASE_LABELS[game.phase] ?? [game.phase, game.phase])[language === "zh" ? 0 : 1]}</strong></div><p>{current ? text(`等待 ${current.name} 决定`, `Waiting for ${current.name}`) : game.phase === "planning" ? text("所有势力同时秘密下令", "All factions assign orders simultaneously") : text("服务器正在结算", "Resolving on the server")}</p><div className="wildling-meter"><span>{text("荒境威胁", "Frontier threat")}</span><b>{game.wildlingThreat}/12</b></div></section>
     <PlayerRibbon game={game} language={language} act={act} />
-    <div className="realm-main-grid"><section className="realm-map-wrap"><RealmMap game={game} language={language} selectedKey={selectedAreaId} onSelect={setSelectedAreaId} selectableAreaIds={selectableAreaIds} /></section><aside className="realm-command"><ActionPanel game={game} me={me} language={language} act={act} busy={busy} selectedAreaId={selectedAreaId} onSelectArea={setSelectedAreaId} /><InfluenceTracks game={game} language={language} />{error && <p className="realm-error">{error}</p>}<Chronicle game={game} language={language} /></aside></div>
+    <div className="realm-main-grid"><section className="realm-map-wrap"><RealmMap game={game} language={language} selectedKey={selectedAreaId} onSelect={setSelectedAreaId} selectableAreaIds={selectableAreaIds} /></section><aside className="realm-command"><ActionPanel game={game} me={me} language={language} act={act} busy={busy} selectedAreaId={selectedAreaId} onSelectArea={setSelectedAreaId} />{error && <p className="realm-error">{error}</p>}<Chronicle game={game} language={language} /></aside></div>
     {rulesOpen && <RulesModal language={language} onClose={closeRules} />}
   </main>;
 }
@@ -211,44 +212,40 @@ function PlayerRibbon({ game, language, act }: { game: Game; language: Language;
   return <div className="realm-players">{game.players.map((player) => { const faction = game.factions.find((item) => item.key === player.faction); const active = game.currentPlayerId === player.id; return <article key={player.id} className={active ? "active" : ""} style={{ "--faction": faction?.color ?? "#777" } as CSSProperties}><i /><div><strong>{player.name}{player.isBot ? " · AI" : !player.isOnline ? text(" · 断线", " · offline") : ""}</strong><small>{faction ? (language === "zh" ? faction.name : faction.nameEn) : text("等待分配", "Unassigned")}</small></div><b>♜ {player.castles}/7</b><span>◆ {player.power} · ▰ {player.supply}</span>{game.phase === "planning" && <em>{player.submitted ? text("已封存", "Locked") : text("下令中", "Planning")}</em>}{isHost && game.phase !== "lobby" && game.phase !== "finished" && player.id !== game.viewerId && !player.isBot && !player.isOnline && <button className="realm-entrust" onClick={() => act("entrust", { targetPlayerId: player.id })}>{text("交给 AI", "Entrust to AI")}</button>}</article>; })}</div>;
 }
 
-const REGION_PATHS: Record<string, string> = {
-  northhold: "38% 3%,55% 3%,64% 11%,57% 18%,42% 17%,34% 10%",
-  frozen_pass: "20% 4%,38% 3%,34% 10%,38% 17%,29% 21%,18% 14%",
-  high_peaks: "12% 13%,20% 4%,18% 14%,29% 21%,22% 29%,10% 25%",
-  ice_coast: "29% 21%,38% 17%,43% 27%,35% 34%,22% 29%",
-  wolfwood: "38% 17%,57% 18%,55% 28%,43% 27%",
-  crown_road: "57% 18%,64% 11%,73% 20%,69% 30%,55% 28%",
-  shadow_fort: "10% 25%,22% 29%,24% 40%,15% 48%,7% 40%",
-  riverwatch: "22% 29%,35% 34%,43% 27%,49% 38%,39% 45%,24% 40%",
-  west_hills: "15% 48%,24% 40%,39% 45%,35% 55%,19% 59%,10% 53%",
-  moon_gate: "69% 30%,73% 20%,83% 25%,88% 34%,82% 38%,76% 39%,67% 40%",
-  goldhaven: "10% 53%,19% 59%,18% 69%,10% 72%,4% 64%",
-  central_plains: "39% 45%,49% 38%,55% 28%,67% 40%,64% 52%,51% 57%,35% 55%",
-  throne_city: "64% 52%,67% 40%,76% 39%,74% 48%,75% 54%,73% 60%",
-  sunfield: "19% 59%,35% 55%,51% 57%,45% 67%,28% 69%,18% 69%",
-  highgarden: "28% 69%,45% 67%,52% 76%,43% 84%,27% 80%",
-  red_desert: "18% 69%,28% 69%,27% 80%,20% 90%,9% 85%,10% 72%",
-  lower_river: "45% 67%,51% 57%,64% 52%,73% 60%,66% 72%,52% 76%",
-  stormlands: "73% 60%,75% 54%,82% 52%,88% 58%,86% 70%,75% 74%,66% 72%",
-  east_hills: "82% 52%,81% 46%,82% 38%,88% 34%,94% 41%,93% 52%,88% 58%",
-  ember_keep: "52% 76%,66% 72%,75% 74%,76% 86%,63% 93%,43% 84%",
-  red_steppe: "75% 74%,86% 70%,94% 73%,94% 86%,80% 92%,76% 86%",
-  tidewatch: "88% 34%,93% 27%,98% 32%,99% 44%,93% 52%,94% 41%",
-  salt_marsh: "86% 70%,88% 58%,93% 52%,99% 57%,99% 72%,94% 73%",
-  glass_isle: "3% 72%,11% 70%,17% 75%,15% 86%,7% 90%,2% 83%",
-  frozen_sea: "0% 0%,100% 0%,100% 22%,83% 25%,73% 20%,64% 11%,55% 3%,38% 3%,20% 4%,12% 13%,0% 20%",
-  western_sea: "0% 20%,12% 13%,10% 25%,7% 40%,10% 53%,4% 64%,0% 64%",
-  golden_bay: "0% 55%,10% 53%,4% 64%,10% 72%,3% 72%,0% 74%",
-  southern_sea: "0% 74%,3% 72%,2% 83%,7% 90%,20% 90%,27% 80%,43% 84%,63% 93%,66% 100%,0% 100%",
-  ember_sea: "66% 100%,63% 93%,80% 92%,94% 86%,100% 87%,100% 100%",
-  eastern_sea: "100% 22%,83% 25%,93% 27%,98% 32%,99% 44%,93% 52%,99% 57%,99% 72%,94% 73%,94% 86%,100% 87%",
-  central_strait: "76% 39%,82% 38%,81% 46%,82% 52%,75% 54%,74% 48%",
-};
+type MapPoint = [number, number];
+
+function clipCell(polygon: MapPoint[], seed: MapPoint, rival: MapPoint) {
+  const a = 2 * (rival[0] - seed[0]);
+  const b = 2 * (rival[1] - seed[1]);
+  const c = rival[0] ** 2 + rival[1] ** 2 - seed[0] ** 2 - seed[1] ** 2;
+  const inside = ([x, y]: MapPoint) => a * x + b * y <= c + .0001;
+  const crossing = (from: MapPoint, to: MapPoint): MapPoint => {
+    const denominator = a * (to[0] - from[0]) + b * (to[1] - from[1]);
+    const t = denominator === 0 ? 0 : (c - a * from[0] - b * from[1]) / denominator;
+    return [from[0] + (to[0] - from[0]) * t, from[1] + (to[1] - from[1]) * t];
+  };
+  const result: MapPoint[] = [];
+  for (let index = 0; index < polygon.length; index += 1) {
+    const current = polygon[index];
+    const next = polygon[(index + 1) % polygon.length];
+    if (inside(current)) result.push(current);
+    if (inside(current) !== inside(next)) result.push(crossing(current, next));
+  }
+  return result;
+}
+
+function buildRegionPolygons(regions: AreaDefinition[]) {
+  return Object.fromEntries(regions.map((region) => {
+    let polygon: MapPoint[] = [[.5, .5], [80.5, .5], [80.5, 99.5], [.5, 99.5]];
+    for (const rival of regions) if (rival.key !== region.key) polygon = clipCell(polygon, [region.x, region.y], [rival.x, rival.y]);
+    return [region.key, polygon];
+  })) as Record<string, MapPoint[]>;
+}
 
 const AREA_TERRAIN: Record<string, string> = {
-  high_peaks: "mountain", frozen_pass: "mountain", east_hills: "mountain", ember_keep: "mountain",
-  wolfwood: "forest", shadow_fort: "forest", riverwatch: "river", lower_river: "river",
-  red_desert: "desert", red_steppe: "desert", salt_marsh: "marsh", sunfield: "field",
+  karpeak: "mountain", moon_mountains: "mountain", ironwood: "mountain", red_pass: "mountain",
+  crownwood: "forest", greyfen: "marsh", riverwatch: "river", crown_lowlands: "river",
+  ember_march: "desert", salt_shore: "desert", central_plains: "field", highgarden: "field",
 };
 
 function MapUnitPiece({ unit, color, language }: { unit: Unit; color?: string; language: Language }) {
@@ -264,6 +261,9 @@ function RealmMap({ game, language, selectedKey, onSelect, selectableAreaIds }: 
   const selectedOwnerKey = selectedState?.units[0]?.faction ?? selectedState?.control;
   const selectedOwner = selectedOwnerKey ? factionMap.get(selectedOwnerKey) : null;
   const kindLabel = selectedDefinition?.kind === "sea" ? (language === "zh" ? "海域" : "Sea") : selectedDefinition?.kind === "port" ? (language === "zh" ? "港口" : "Port") : (language === "zh" ? "陆地" : "Land");
+  const regions = useMemo(() => game.areaDefinitions.filter((definition) => definition.kind !== "port"), [game.areaDefinitions]);
+  const ports = useMemo(() => game.areaDefinitions.filter((definition) => definition.kind === "port"), [game.areaDefinitions]);
+  const regionPolygons = useMemo(() => buildRegionPolygons(regions), [regions]);
 
   const renderContents = (definition: AreaDefinition, inPort = false) => {
     const state = game.areas[definition.key];
@@ -271,24 +271,28 @@ function RealmMap({ game, language, selectedKey, onSelect, selectableAreaIds }: 
     const selectable = !selectableAreaIds.length || selectableAreaIds.includes(definition.key);
     return <span className="area-content" style={{ left: `${definition.x}%`, top: `${definition.y}%` }} role={inPort || !selectable ? undefined : "button"} tabIndex={inPort || !selectable ? undefined : 0} onClick={inPort || !selectable ? undefined : (event) => { event.stopPropagation(); chooseArea(definition.key); }} onKeyDown={inPort || !selectable ? undefined : (event) => { if (event.key === "Enter" || event.key === " ") { event.preventDefault(); chooseArea(definition.key); } }}>
       <strong>{language === "zh" ? definition.name : definition.nameEn}</strong>
-      <span className="area-icons">{definition.castle && <i>♜{definition.castle}</i>}{definition.supply && <i>▰{definition.supply}</i>}{definition.power && <i>◆{definition.power}</i>}{state.neutral && <i className="neutral">⚔{state.neutral >= 99 ? "∞" : state.neutral}</i>}{state.garrison && <i className="garrison">▣{state.garrison}</i>}</span>
+      <span className="area-icons">{definition.castle && <i>♜{definition.castle}</i>}{definition.supply && <i>▰{definition.supply}</i>}{definition.power && <i>◆{definition.power}</i>}{state.blocked && <i className="blocked">⊘</i>}{state.neutral && !state.blocked && <i className="neutral">⚔{state.neutral}</i>}{state.garrison && !state.neutral && <i className="garrison">▣{state.garrison}</i>}</span>
       {units.length > 0 && <span className="area-units">{units.map((unit) => <MapUnitPiece key={unit.id} unit={unit} color={factionMap.get(unit.faction)?.color} language={language} />)}</span>}
       {state.order && <i className={`map-order ${state.order === "hidden" ? "hidden" : ""}`}>{state.order === "hidden" ? "?" : ORDER_LABELS[state.order as Order][language === "zh" ? 0 : 1]}</i>}
     </span>;
   };
 
-  const regions = game.areaDefinitions.filter((definition) => definition.kind !== "port");
-  const ports = game.areaDefinitions.filter((definition) => definition.kind === "port");
   return <div className="realm-map" aria-label={language === "zh" ? "六境战争版图" : "Map of the Six Realms"}>
     <div className="map-compass" aria-hidden="true">✦<small>N</small></div>
     <div className="map-legend"><b>{language === "zh" ? "点击区域名称选择" : "Select by clicking a name"}</b><span>♜ {language === "zh" ? "城堡" : "Castle"}</span><span>▰ {language === "zh" ? "补给" : "Supply"}</span><span>◆ {language === "zh" ? "威望" : "Power"}</span></div>
-    <div className="map-relief" aria-hidden="true"><span className="ridge ridge-north">▲ ▲ ▲ ▲</span><span className="ridge ridge-east">▲ ▲ ▲</span><span className="forest-mark">♠ ♠ ♠</span><span className="river-mark river-one" /><span className="river-mark river-two" /></div>
+    <svg className="realm-region-overlay" viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true">{regions.map((definition) => {
+      const state = game.areas[definition.key];
+      const owner = state.units[0]?.faction ?? state.control;
+      const faction = owner ? factionMap.get(owner) : null;
+      return <polygon key={definition.key} className={`${definition.kind} ${state.blocked ? "blocked" : ""} ${selectedKey === definition.key ? "selected" : ""}`} points={regionPolygons[definition.key].map((point) => point.join(",")).join(" ")} style={{ "--region-owner": faction?.color ?? (definition.kind === "sea" ? "#4e8190" : "#b7a67d") } as CSSProperties} />;
+    })}</svg>
     {regions.map((definition) => {
       const state = game.areas[definition.key];
       const owner = state.units[0]?.faction ?? state.control;
       const faction = owner ? factionMap.get(owner) : null;
-      return <article key={definition.key} className={`realm-area ${definition.kind} terrain-${AREA_TERRAIN[definition.key] ?? "plain"} ${state.order ? "has-order" : ""} ${selectableAreaIds.includes(definition.key) ? "selectable" : ""} ${selectedKey === definition.key ? "selected" : ""}`} style={{ "--owner": faction?.color ?? (definition.kind === "sea" ? "#3d7380" : "#9a8d70") } as CSSProperties}>
-        <button className="region-hit" style={{ clipPath: `polygon(${REGION_PATHS[definition.key]})` }} onClick={() => chooseArea(definition.key)} disabled={Boolean(selectableAreaIds.length && !selectableAreaIds.includes(definition.key))} aria-label={language === "zh" ? definition.name : definition.nameEn} title={language === "zh" ? definition.name : definition.nameEn} />
+      const path = regionPolygons[definition.key].map(([x, y]) => `${x}% ${y}%`).join(",");
+      return <article key={definition.key} className={`realm-area ${definition.kind} terrain-${AREA_TERRAIN[definition.key] ?? "plain"} ${state.blocked ? "blocked" : ""} ${state.order ? "has-order" : ""} ${selectableAreaIds.includes(definition.key) ? "selectable" : ""} ${selectedKey === definition.key ? "selected" : ""}`} style={{ "--owner": faction?.color ?? (definition.kind === "sea" ? "#3d7380" : "#9a8d70") } as CSSProperties}>
+        <button className="region-hit" style={{ clipPath: `polygon(${path})` }} onClick={() => chooseArea(definition.key)} disabled={state.blocked || Boolean(selectableAreaIds.length && !selectableAreaIds.includes(definition.key))} aria-label={language === "zh" ? definition.name : definition.nameEn} title={language === "zh" ? definition.name : definition.nameEn} />
         {renderContents(definition)}
       </article>;
     })}
@@ -296,8 +300,9 @@ function RealmMap({ game, language, selectedKey, onSelect, selectableAreaIds }: 
       const state = game.areas[definition.key];
       const owner = state.units[0]?.faction ?? state.control;
       const faction = owner ? factionMap.get(owner) : null;
-      return <button key={definition.key} className={`realm-port ${selectableAreaIds.includes(definition.key) ? "selectable" : ""} ${selectedKey === definition.key ? "selected" : ""}`} style={{ left: `${definition.x}%`, top: `${definition.y}%`, "--owner": faction?.color ?? "#806c4e" } as CSSProperties} onClick={() => chooseArea(definition.key)} disabled={Boolean(selectableAreaIds.length && !selectableAreaIds.includes(definition.key))}>{renderContents(definition, true)}</button>;
+      return <button key={definition.key} className={`realm-port ${state.blocked ? "blocked" : ""} ${selectableAreaIds.includes(definition.key) ? "selectable" : ""} ${selectedKey === definition.key ? "selected" : ""}`} style={{ left: `${definition.x}%`, top: `${definition.y}%`, "--owner": faction?.color ?? "#806c4e" } as CSSProperties} onClick={() => chooseArea(definition.key)} disabled={state.blocked || Boolean(selectableAreaIds.length && !selectableAreaIds.includes(definition.key))}>{renderContents(definition, true)}</button>;
     })}
+    <BoardTracks game={game} language={language} />
     {selectedDefinition && selectedState && <aside className="map-inspector" style={{ "--owner": selectedOwner?.color ?? "#9a8d70" } as CSSProperties}>
       <span>{kindLabel} · {selectedOwner ? (language === "zh" ? selectedOwner.name : selectedOwner.nameEn) : (language === "zh" ? "未控制" : "Uncontrolled")}</span>
       <strong>{language === "zh" ? selectedDefinition.name : selectedDefinition.nameEn}</strong>
@@ -307,15 +312,16 @@ function RealmMap({ game, language, selectedKey, onSelect, selectableAreaIds }: 
   </div>;
 }
 
-function InfluenceTracks({ game, language }: { game: Game; language: Language }) {
+function BoardTracks({ game, language }: { game: Game; language: Language }) {
   const names = language === "zh" ? { throne: "王座 · 行动顺序", fiefdom: "封臣 · 战斗平局/钢剑", court: "王庭 · 星级命令/信鸦" } : { throne: "Throne · turn order", fiefdom: "Fiefdom · ties/blade", court: "Court · stars/raven" };
-  return <section className="influence-card"><h3>{language === "zh" ? "三条影响力轨道" : "Influence tracks"}</h3>{(["throne", "fiefdom", "court"] as const).map((track) => <div key={track}><strong>{names[track]}</strong><ol>{game.influence[track].map((factionKey, index) => { const faction = game.factions.find((item) => item.key === factionKey)!; return <li key={factionKey} style={{ "--faction": faction.color } as CSSProperties}><i />{index + 1}. {language === "zh" ? faction.name : faction.nameEn}</li>; })}</ol></div>)}</section>;
+  const maxCastles = Math.max(0, ...game.players.map((player) => player.castles));
+  return <aside className="board-tracks"><section><h3>{language === "zh" ? "回合" : "Round"}</h3><ol className="number-track round-track">{Array.from({ length: 10 }, (_, index) => index + 1).map((value) => <li key={value} className={value === game.round ? "active" : ""}>{value}</li>)}</ol></section><section><h3>{language === "zh" ? "荒境威胁" : "Frontier threat"}</h3><ol className="number-track">{[0,2,4,6,8,10,12].map((value) => <li key={value} className={value === game.wildlingThreat ? "active danger" : ""}>{value}</li>)}</ol></section><section><h3>{language === "zh" ? "胜利城堡" : "Victory castles"}</h3><ol className="number-track">{[0,1,2,3,4,5,6,7].map((value) => <li key={value} className={value === maxCastles ? "active" : ""}>{value}</li>)}</ol></section>{(["throne", "fiefdom", "court"] as const).map((track) => <section className="board-influence" key={track}><h3>{names[track]}</h3><ol>{game.influence[track].map((factionKey, index) => { const faction = game.factions.find((item) => item.key === factionKey)!; return <li key={factionKey} style={{ "--faction": faction.color } as CSSProperties} title={language === "zh" ? faction.name : faction.nameEn}><i />{index + 1}</li>; })}</ol></section>)}</aside>;
 }
 
 function ActionPanel({ game, me, language, act, busy, selectedAreaId, onSelectArea }: { game: Game; me: Player; language: Language; act: (action: string, payload?: Record<string, unknown>) => void; busy: boolean; selectedAreaId: string; onSelectArea: (areaId: string) => void }) {
   const text = (zh: string, en: string) => language === "zh" ? zh : en;
   if (game.phase === "lobby") return <LobbyPanel game={game} me={me} language={language} act={act} />;
-  if (game.phase === "finished") { const winner = game.players.find((player) => player.id === game.winnerId); return <section className="action-card victory"><span>♛</span><h2>{text(`${winner?.name} 统一六境`, `${winner?.name} unites the realms`)}</h2><p>{text("依次比较城堡、补给、威望与王座顺位。", "Ties are resolved by castles, supply, power, then Throne position.")}</p></section>; }
+  if (game.phase === "finished") { const winner = game.players.find((player) => player.id === game.winnerId); return <section className="action-card victory"><span>♛</span><h2>{text(`${winner?.name} 统一六境`, `${winner?.name} unites the realms`)}</h2><p>{text("依次比较城堡、控制陆地区域、补给与王座顺位。", "Ties are resolved by castles, controlled land areas, supply, then Throne position.")}</p></section>; }
   if (game.phase === "planning") return <PlanningPanel game={game} me={me} language={language} act={act} selectedAreaId={selectedAreaId} onSelectArea={onSelectArea} />;
   if (game.phase === "raven" && game.currentPlayerId === me.id) return <RavenPanel game={game} language={language} act={act} />;
   if (game.phase === "influence_bid" || game.phase === "wildling_bid") return <BidPanel game={game} me={me} language={language} act={act} />;
@@ -329,9 +335,29 @@ function ActionPanel({ game, me, language, act, busy, selectedAreaId, onSelectAr
   if (game.phase === "combat_support" && game.currentPlayerId === me.id) return <SupportPanel game={game} me={me} language={language} act={act} />;
   if (game.phase === "combat_cards" && game.currentPlayerId === me.id) return <LeaderPanel game={game} me={me} language={language} act={act} />;
   if (game.phase === "combat_blade" && game.currentPlayerId === me.id) return <section className="action-card"><h3>{text("是否发动钢剑？", "Use the steel blade?")}</h3><p>{text("本场战斗总战力 +1；每轮只能使用一次。", "+1 final combat strength; once per round.")}</p><div className="choice-grid"><button onClick={() => act("blade", { use: true })}>{text("发动 +1", "Use +1")}</button><button onClick={() => act("blade", { use: false })}>{text("保留", "Save it")}</button></div></section>;
+  if (game.phase === "combat_effect" && game.currentPlayerId === me.id) return <CombatEffectPanel game={game} language={language} act={act} />;
   if (game.phase === "combat_casualties" && game.currentPlayerId === me.id) return <CasualtyPanel game={game} me={me} language={language} act={act} />;
   if (game.phase === "combat_retreat" && game.currentPlayerId === me.id) return <section className="action-card"><h3>{text("选择撤退区域", "Choose a retreat area")}</h3><div className="choice-grid">{game.pendingCombat?.retreatOptions.map((areaId) => <button key={areaId} onClick={() => act("retreat", { areaId })}>{areaName(game, areaId, language)}</button>)}</div></section>;
   return <section className="action-card waiting"><span>⌛</span><h3>{text("等待其他势力", "Waiting for another faction")}</h3><p>{text("牌桌会自动同步；你可以查看版图、影响力和战争记录。", "The table syncs automatically. You can inspect the map, tracks, and war chronicle.")}</p>{busy && <small>{text("正在结算…", "Resolving…")}</small>}</section>;
+}
+
+function CombatEffectPanel({ game, language, act }: { game: Game; language: Language; act: (action: string, payload?: Record<string, unknown>) => void }) {
+  const effect = game.combatEffect!;
+  const text = (zh: string, en: string) => language === "zh" ? zh : en;
+  const titles = {
+    remove_adjacent_order: text("选择要移除的相邻敌方命令", "Choose an adjacent enemy order to remove"),
+    move_influence_bottom: text("选择一条影响力轨道", "Choose an influence track"),
+    discard_enemy_card: text("查看并弃掉一张敌方领袖牌", "Inspect and discard an enemy leader card"),
+    remove_order: text("选择一枚尚未结算的敌方命令", "Choose an unresolved enemy order"),
+    upgrade_unit: text("选择一名参战或本家支援步兵升级", "Choose a participating or friendly supporting Footman to upgrade"),
+  };
+  const optionLabel = (option: string) => {
+    if (effect.type === "move_influence_bottom") return ({ throne: text("王座轨道", "Throne track"), fiefdom: text("封臣轨道", "Fiefdom track"), court: text("王庭轨道", "Court track") } as Record<string, string>)[option] ?? option;
+    if (effect.type === "discard_enemy_card") { const leader = game.leaders.find((candidate) => candidate.key === option); return leader ? `${language === "zh" ? leader.name : leader.nameEn} · ${leader.strength}` : option; }
+    if (effect.type === "upgrade_unit") { const entry = Object.entries(game.areas).find(([, area]) => area.units.some((unit) => unit.id === option)); return entry ? `${areaName(game, entry[0], language)} · ${text("步兵", "Footman")}` : option; }
+    return areaName(game, option, language);
+  };
+  return <section className="action-card battle-card"><h3>{titles[effect.type]}</h3><p>{text("这是领袖牌的正式结算窗口；服务器会验证目标，其他玩家看不到你的秘密选项。", "This is the leader card's formal resolution window. The server validates the target; private choices remain hidden from other players.")}</p><div className="choice-grid">{effect.options.map((option) => <button key={option} onClick={() => act("combatEffect", { option })}>{optionLabel(option)}</button>)}{effect.optional && <button onClick={() => act("combatEffect")}>{text("不发动能力", "Skip ability")}</button>}</div></section>;
 }
 
 function LobbyPanel({ game, me, language, act }: { game: Game; me: Player; language: Language; act: (action: string, payload?: Record<string, unknown>) => void }) {
@@ -467,33 +493,35 @@ function Chronicle({ game, language }: { game: Game; language: Language }) {
 function RulesModal({ language, onClose }: { language: Language; onClose: () => void }) {
   const zh = language === "zh";
   const sections = zh ? [
-    ["目标与终局", "游戏进行至多十轮。任何势力一旦控制七个带城堡或要塞的陆地区域，立即获胜；否则第十轮后依次比较城堡数量、补给、可用威望与王座顺位。"],
+    ["目标与终局", "游戏进行至多十轮。任何势力一旦控制七个带城堡或要塞的陆地区域，立即获胜；否则第十轮后依次比较城堡数量、控制的陆地区域总数、补给等级与王座顺位。"],
+    ["人数与开局", "仅支持官方基础游戏的 3–6 人配置。三人使用曜金、玄羽、北辰；四人加入苍潮；五人加入绿冠；六人加入赤岭。不同人数使用对应封锁区、中立军、初始部队和影响力顺位；玄羽在三人局依 FAQ 修订移除港内舰船。"],
     ["每轮结构", "第一轮跳过事件阶段。其余轮次依次揭示三张王国事件、推进荒境威胁并结算事件，然后进行同时秘密下令，最后依次结算突袭、行军和集权命令。"],
     ["补给与军团", "同一区域两支以上部队构成军团。补给轨道限制可拥有的军团数量和规模；征召、行军和撤退都不能制造超过补给的军团。补给只在补给事件或明确效果发生时重新计算。"],
     ["征召", "要塞提供 2 点，城堡提供 1 点。步兵与舰船各花 1 点，骑兵和攻城器各花 2 点；本地步兵可用 1 点升级。舰船只能进入相连港口或没有敌舰的邻海。港口最多三舰。"],
     ["秘密命令", "每个有部队的区域必须放一枚命令。每家拥有十五枚命令标记；王庭轨道决定本轮可使用的星级命令数。全部提交后同时揭晓。信鸦持有者可替换一枚自己的命令，或查看荒境牌堆顶并将它放回顶部或移到底部。"],
-    ["突袭", "按王座顺序轮流结算一枚突袭。普通突袭可取消相邻的突袭、支援或集权；星级突袭还可取消防御。陆地不能突袭海域；港口与相连海域可以互相突袭。突袭突袭时两枚同时移除。"],
+    ["突袭", "按王座顺序轮流结算一枚突袭。普通突袭可取消相邻的突袭、支援或集权；星级突袭还可取消防御。陆地不能突袭海域；海域可突袭陆地或海域，港口只能突袭相连海域。取消集权时，突袭方获得 1 威望，目标方若有则失去 1 威望。"],
     ["行军与控制", "按王座顺序轮流结算一枚行军。部队可拆分前往多个合法区域，但每枚行军最多发起一场战斗。完全撤离陆地时可花 1 威望留下控制标记。连续友方舰船可运输陆军跨海；舰船自身不能使用运输。"],
-    ["战斗与支援", "战力来自参战部队、行军修正、防御命令、驻军、相邻支援、领袖牌与钢剑。第三方可以公开支援任一方或拒绝支援，但不能支援敌人攻击自己的部队。攻城器仅在进攻带城堡或要塞的区域时提供 4 战力。平局由封臣轨道靠前者获胜。"],
-    ["伤亡与撤退", "胜方领袖牌的剑图标减去败方城堡图标决定伤亡。败方选择被消灭部队；攻城器与已溃败部队无法再次撤退。幸存败军撤到一个合法相邻区域并横置为溃败，行动阶段结束时恢复。主城驻军一旦战败永久移除。"],
+    ["战斗与支援", "战力来自参战部队、行军修正、防御命令、驻军、相邻支援、领袖牌与钢剑。一个势力的全部相关支援命令必须一起宣布支援同一方或全部拒绝，不能拆给交战双方，也不能支援敌人攻击自己的部队。攻城器仅在进攻带城堡或要塞的区域时提供 4 战力。平局由封臣轨道靠前者获胜。"],
+    ["伤亡与撤退", "胜方领袖牌的剑图标减去败方城堡图标决定伤亡。败方选择被消灭部队；攻城器与已溃败部队无法撤退。防守败军可撤到合法相邻区域或经连续友方舰船运输到达的陆地，并横置为溃败；进攻败军退回出发地，若该地已不合法则被消灭。行动阶段结束时恢复。主城驻军一旦战败永久移除。"],
     ["领袖牌", "每家七张牌。双方秘密选择后同时公开并执行文字能力。已使用牌进入公开弃牌堆；当打出手中最后一张时，收回先前弃掉的六张，刚打出的牌仍留在弃牌堆。"],
     ["影响力与竞价", "王座轨道决定行动顺序并裁决竞价平手；封臣轨道裁决战斗平手，首位持有每轮一次的钢剑；王庭轨道决定星级命令数量，首位持有信鸦。诸王之争事件会依次秘密竞拍三条轨道，所有出价无论胜负都支付。"],
-    ["荒境入侵", "三张事件上的荒境图标会推进威胁；到达 12 或揭示入侵事件时，各家秘密投入威望。总和达到威胁值则守军获胜且最高贡献者获奖；否则荒境获胜，最低出价者承受最严重惩罚。"],
+    ["荒境入侵", "每个事件牌上的荒境图标会令威胁沿 0、2、4…12 轨道前进一格；到达 12 或揭示入侵事件时，各家秘密投入威望。总和达到威胁值则守军获胜、威胁归零且最高贡献者获奖；否则荒境获胜、威胁后退一格（数值 −2），最低出价者承受最严重惩罚。"],
     ["港口、中立与联盟", "港口归连接陆地的控制者，只容纳舰船；敌人夺取陆地后可用自己的可用舰船替换港内敌舰。中立势力必须由行军战力加合法支援达到其数值才能击败，不使用领袖牌或钢剑。谈判与承诺随时允许，但不具约束力；不能展示秘密命令、秘密出价或转让组件。"],
   ] : [
-    ["Objective", "The game lasts at most ten rounds. A faction immediately wins on controlling seven Castle or Stronghold areas; otherwise ties after round ten are broken by castles, supply, available power, then Throne position."],
+    ["Objective", "The game lasts at most ten rounds. A faction immediately wins on controlling seven Castle or Stronghold areas; otherwise ties after round ten are broken by castles, total controlled land areas, supply, then Throne position."],
+    ["Player-count setup", "Only the official 3–6 player base-game structures are supported. Sunward, Umbral, and Frost play at three; Tide joins at four; Verdant at five; Redmarch at six. Each count applies its matching blocked areas, neutral forces, starting units, and influence positions. The three-player Umbral port Ship follows the FAQ correction."],
     ["Round structure", "Round one skips Realm Events. Later rounds reveal three events and advance the frontier threat, then all factions assign secret orders before resolving Raids, Marches, and Consolidate Power orders."],
     ["Supply and armies", "Two or more units in one area form an army. Supply limits the number and size of armies. Mustering, marching, and retreating may never exceed the current limit; supply is recalculated only when instructed."],
     ["Mustering", "Strongholds provide 2 points and Castles 1. Footmen and Ships cost 1; Knights and Siege Engines cost 2. A local Footman upgrades for 1. Ships enter the connected port or an enemy-free adjacent sea; ports hold three Ships."],
     ["Secret orders", "Every occupied area receives one order from a faction's set of fifteen. Court position limits starred orders. Orders reveal together; the Raven holder may replace one own order or inspect the frontier deck and keep its top card or move it to the bottom."],
-    ["Raids", "In Throne order, resolve one Raid at a time. Normal Raids cancel adjacent Raid, Support, or Consolidate orders; starred Raids can also cancel Defense. Land cannot raid sea. Ports and their connected sea can raid one another."],
+    ["Raids", "In Throne order, resolve one Raid at a time. Normal Raids cancel adjacent Raid, Support, or Consolidate orders; starred Raids can also cancel Defense. Land cannot raid sea; sea may raid land or sea; a port may raid only its connected sea. Pillaging Consolidate gains 1 power and makes the target lose 1 if able."],
     ["March and control", "A March may split units among several legal destinations but initiate only one battle. Pay 1 power to retain control of a fully vacated land area. Chains of friendly Ships transport land units; Ships cannot transport themselves."],
-    ["Combat and support", "Strength comes from units, March and Defense modifiers, garrisons, adjacent Support, leader cards, and the blade. Third parties openly support either side or neither, but cannot support an enemy against their own units. Siege Engines provide 4 only while attacking a Castle or Stronghold. Fiefdom position breaks ties."],
-    ["Casualties and retreat", "Winner swords minus loser fortifications determine casualties. The loser chooses losses; Siege Engines and already-routed units cannot retreat again. Survivors retreat to one legal area and become routed until the Action phase ends. A defeated home garrison is permanently removed."],
+    ["Combat and support", "Strength comes from units, March and Defense modifiers, garrisons, adjacent Support, leader cards, and the blade. A House declares all of its relevant Support orders together for one side or neither; it cannot split them across both sides or support an enemy against its own units. Siege Engines provide 4 only while attacking a Castle or Stronghold. Fiefdom position breaks ties."],
+    ["Casualties and retreat", "Winner swords minus loser fortifications determine casualties. The loser chooses losses; Siege Engines and already-routed units cannot retreat. Defenders may retreat to an adjacent legal area or use friendly ship transport; attackers return to origin and are destroyed if it is no longer legal. Survivors route until the Action phase ends. A defeated home garrison is permanently removed."],
     ["Leader cards", "Each faction has seven. Both sides choose secretly, reveal together, and resolve text. Used cards form an open discard pile. On playing the final card in hand, recover the previous six while the just-played card remains discarded."],
     ["Influence", "Throne controls order and bidding ties; Fiefdom breaks combat ties and grants the once-per-round blade; Court controls starred orders and grants the Raven. Influence events secretly auction the tracks in that order, and all bids are spent."],
-    ["Frontier attack", "Event icons raise threat. At 12 or on an attack event, factions secretly bid power. Meeting the threat wins and rewards the highest bidder; failure applies the card's punishment, with the lowest bidder suffering most."],
+    ["Frontier attack", "Each event icon advances the 0–12 track one space (two printed points). At 12 or on an attack event, factions secretly bid power. Meeting the threat resets it to 0 and rewards the highest bidder; failure moves it back one space (−2) and applies the card's punishment, with the lowest bidder suffering most."],
     ["Ports, neutrals, alliances", "Ports belong to their connected land and hold only Ships. Conquering the land replaces enemy port Ships with available friendly Ships. Neutral forces require equal or greater March strength plus legal Support, without leader cards or the blade. Promises are allowed but never binding; secret components cannot be shown or traded."],
   ];
-  return <div className="realm-modal" role="dialog" aria-modal="true"><article><header><div><span>✦</span><h2>{zh ? "《六境争霸》完整规则" : "The Six Realms · Complete Rules"}</h2></div><button onClick={onClose}>×</button></header><p className="rules-note">{zh ? "本游戏使用原创世界观与文字，按经典第二版基础游戏规则运行；牌名、地图与美术均为原创。" : "This game uses original names, map, and artwork while running on the classic second-edition base-game rules."}</p>{sections.map(([title, body], index) => <section key={title}><b>{String(index + 1).padStart(2,"0")}</b><div><h3>{title}</h3><p>{body}</p></div></section>)}</article></div>;
+  return <div className="realm-modal" role="dialog" aria-modal="true"><article><header><div><span>✦</span><h2>{zh ? "《六境争霸》完整规则" : "The Six Realms · Complete Rules"}</h2></div><button onClick={onClose}>×</button></header><p className="rules-note">{zh ? "规则实现依据 Fantasy Flight Games 官方第二版规则书及 FAQ v2；世界观、地图名称与美术为原创。" : "Rules are implemented from Fantasy Flight Games' official Second Edition rulebook and FAQ v2; setting, map names, and artwork are original."} <a href="https://images-cdn.fantasyflightgames.com/filer_public/30/4f/304f72e3-4fe4-4f91-bfbe-75133161b092/va65_agot2_rulebook_web.pdf" target="_blank" rel="noreferrer">{zh ? "官方规则书" : "Official rulebook"}</a> · <a href="https://images-cdn.fantasyflightgames.com/filer_public/cf/06/cf06eb26-48e3-46b9-b57c-f053beb2518d/agotbg_faq_v2_forweb.pdf" target="_blank" rel="noreferrer">FAQ v2</a></p>{sections.map(([title, body], index) => <section key={title}><b>{String(index + 1).padStart(2,"0")}</b><div><h3>{title}</h3><p>{body}</p></div></section>)}</article></div>;
 }

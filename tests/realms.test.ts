@@ -11,15 +11,15 @@ import {
   submitRealmOrders,
   type RealmState,
 } from "../lib/realms.ts";
-import { REALM_AREAS, REALM_EVENT_DECKS, REALM_FACTIONS, REALM_LEADERS, REALM_ORDER_COUNTS, type RealmOrderType } from "../lib/realms-data.ts";
+import { REALM_AREAS, REALM_EVENT_DECKS, REALM_FACTIONS, REALM_LEADERS, REALM_ORDER_COUNTS, REALM_PLAYER_SETUPS, REALM_STARTING_UNITS, type RealmOrderType } from "../lib/realms-data.ts";
 
 test("ships six factions, a full leader deck, fifteen orders, and a connected realm map", () => {
   assert.equal(REALM_FACTIONS.length, 6);
   assert.equal(REALM_LEADERS.length, 42);
   assert.equal(Object.values(REALM_ORDER_COUNTS).reduce((sum, count) => sum + count, 0), 15);
-  assert.equal(REALM_AREAS.filter((area) => area.kind === "land").length, 24);
-  assert.equal(REALM_AREAS.filter((area) => area.kind === "sea").length, 7);
-  assert.equal(REALM_AREAS.filter((area) => area.kind === "port").length, 6);
+  assert.equal(REALM_AREAS.filter((area) => area.kind === "land").length, 38);
+  assert.equal(REALM_AREAS.filter((area) => area.kind === "sea").length, 12);
+  assert.equal(REALM_AREAS.filter((area) => area.kind === "port").length, 8);
   for (const area of REALM_AREAS) {
     assert.ok(area.adjacent.length > 0, `${area.key} needs an adjacent area`);
     for (const adjacent of area.adjacent) assert.ok(REALM_AREAS.some((candidate) => candidate.key === adjacent), `${area.key} points to missing ${adjacent}`);
@@ -33,12 +33,16 @@ test("starts every supported player count with factions, forces, tracks, and sev
     startRealmGame(state, host.id);
     assert.equal(state.players.length, playerCount);
     assert.equal(new Set(state.players.map((player) => player.faction)).size, playerCount);
+    assert.deepEqual(state.players.map((player) => player.faction), REALM_PLAYER_SETUPS[playerCount].factions);
     assert.equal(state.influence.throne.length, playerCount);
     for (const player of state.players) {
       assert.equal(player.leaderHand.length, 7);
       const units = Object.values(state.areas).flatMap((area) => area.units).filter((unit) => unit.faction === player.faction);
-      assert.equal(units.length, 4);
+      const expected = REALM_STARTING_UNITS.filter((placement) => placement.faction === player.faction && !REALM_PLAYER_SETUPS[playerCount].removedStartingAreas.includes(placement.area)).reduce((sum, placement) => sum + (placement.quantity ?? 1), 0);
+      assert.equal(units.length, expected);
     }
+    for (const areaId of REALM_PLAYER_SETUPS[playerCount].blocked) assert.equal(state.areas[areaId].blocked, true);
+    for (const [areaId, strength] of Object.entries(REALM_PLAYER_SETUPS[playerCount].neutralForces)) assert.equal(state.areas[areaId].neutral, strength);
   }
 });
 
@@ -160,6 +164,7 @@ test("a failed frontier defense applies the Wildling card to every participating
   assert.equal(after[state.players[0].id], before[state.players[0].id] - 2);
   assert.equal(after[state.players[1].id], before[state.players[1].id] - 2);
   assert.equal(after[state.players[2].id], before[state.players[2].id] - 3);
+  assert.equal(state.wildlingThreat, 10);
 });
 
 function stalledState(state: RealmState) {
