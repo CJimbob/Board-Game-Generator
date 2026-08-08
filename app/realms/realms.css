@@ -184,14 +184,12 @@
 .realm-map {
   position: relative;
   min-width: 68rem;
-  aspect-ratio: 17 / 13;
+  aspect-ratio: 3 / 2;
   overflow: hidden;
   background:
-    radial-gradient(circle at 14% 17%, rgba(237, 231, 198, .055) 0 1px, transparent 2px),
-    radial-gradient(circle at 72% 70%, rgba(237, 231, 198, .045) 0 1px, transparent 2px),
-    repeating-radial-gradient(ellipse at 50% 55%, transparent 0 15px, rgba(170, 207, 204, .025) 16px 17px),
-    linear-gradient(145deg, #244852, #173740 60%, #102b34);
-  background-size: 23px 27px, 31px 29px, auto, auto;
+    linear-gradient(rgba(8, 25, 29, .08), rgba(8, 25, 29, .2)),
+    url("/realms-map.webp") center / cover no-repeat,
+    #173740;
 }
 .realm-map::before {
   content: "THE SIX REALMS  /  六境全图";
@@ -276,6 +274,15 @@
 .realm-area.terrain-desert .region-hit { background: repeating-radial-gradient(ellipse at 30% 50%, transparent 0 9px, rgba(118, 74, 39, .12) 10px 11px), color-mix(in srgb, var(--owner) 25%, #d8b983); }
 .realm-area.terrain-marsh .region-hit { background: repeating-linear-gradient(12deg, rgba(62, 91, 70, .12) 0 1px, transparent 1px 8px), color-mix(in srgb, var(--owner) 26%, #abb18d); }
 .realm-area.terrain-field .region-hit { background: repeating-linear-gradient(84deg, rgba(121, 96, 48, .08) 0 1px, transparent 1px 9px), color-mix(in srgb, var(--owner) 27%, #d0c292); }
+.realm-area.land .region-hit {
+  background: color-mix(in srgb, var(--owner) 13%, transparent);
+  filter: drop-shadow(0 0 1px rgba(232, 213, 165, .78)) drop-shadow(0 2px 2px rgba(8, 15, 14, .18));
+}
+.realm-area.sea .region-hit {
+  background: color-mix(in srgb, var(--owner) 7%, transparent);
+  filter: drop-shadow(0 0 1px rgba(143, 191, 194, .48));
+}
+.map-relief { display: none; }
 .realm-area .region-hit:hover { filter: brightness(1.09) saturate(1.12) drop-shadow(0 0 2px #f3d887) drop-shadow(0 7px 9px rgba(3, 18, 21, .24)); }
 .realm-area.selected .region-hit { filter: brightness(1.08) saturate(1.16) drop-shadow(0 0 3px #f3d887) drop-shadow(0 0 8px rgba(235, 201, 113, .8)); }
 .area-content {
@@ -291,8 +298,9 @@
   text-shadow: 0 1px rgba(255, 250, 230, .55);
 }
 .realm-area.sea .area-content { opacity: .8; text-shadow: 0 1px 2px #0a252d; }
-.area-content strong { display: block; max-width: 6.4rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font: 900 .58rem "Songti SC", STSong, Georgia, serif; letter-spacing: .03em; }
+.area-content strong { display: block; max-width: 6.4rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; padding: .12rem .25rem; color: #171d19; background: rgba(236, 224, 193, .82); border: 1px solid rgba(78, 64, 41, .25); box-shadow: 0 2px 5px rgba(11, 22, 20, .18); font: 900 .58rem "Songti SC", STSong, Georgia, serif; letter-spacing: .03em; }
 .realm-area.sea .area-content strong { font: italic 800 .6rem Georgia, "Songti SC", serif; letter-spacing: .08em; }
+.realm-area.sea .area-content strong { color: #dcece8; background: rgba(8, 38, 45, .68); border-color: rgba(160, 199, 196, .25); }
 .area-icons { display: flex; gap: .22rem; min-height: .7rem; margin-top: .08rem; font-size: .5rem; }
 .area-icons i { font-style: normal; }
 .area-icons .neutral { color: #9b2429; font-weight: 900; }
@@ -380,6 +388,22 @@
 .order-grid button.selected, .order-area-tabs button.selected { color: #fff8e8; background: #34484a; border-color: #b4934e; }
 .order-area-tabs { display: flex; gap: .35rem; overflow-x: auto; padding-bottom: .2rem; }
 .order-area-tabs button { flex: 0 0 auto; }
+.planning-progress { display: grid; gap: .55rem; margin: -1rem -1rem .25rem; padding: .8rem 1rem; color: #e9e2d2; background: linear-gradient(115deg, #172b30, #293d3d); border-bottom: 2px solid #ad8b49; }
+.planning-progress header { display: flex; align-items: center; justify-content: space-between; gap: .7rem; }
+.planning-progress header > div { display: flex; align-items: center; gap: .45rem; }
+.planning-progress header i { width: .5rem; height: .5rem; background: #e2c16d; border-radius: 50%; box-shadow: 0 0 0 0 rgba(226, 193, 109, .6); animation: realm-planning-pulse 1.8s infinite; }
+.planning-progress header strong { font: 900 .78rem "Songti SC", STSong, Georgia, serif; }
+.planning-progress header span { color: #e0c987; font-size: .58rem; font-weight: 900; }
+.planning-progress > p { color: #bfcac5; font-size: .58rem; }
+.planning-progress > div { display: flex; gap: .3rem; flex-wrap: wrap; }
+.planning-progress > div > span { display: flex; gap: .3rem; align-items: center; padding: .28rem .4rem; color: #e3dfd2; background: rgba(255,255,255,.055); border: 1px solid rgba(255,255,255,.09); font-size: .5rem; }
+.planning-progress > div > span > i { width: .42rem; height: .42rem; background: var(--faction); border-radius: 50%; }
+.planning-progress > div > span > b { color: #9ead9f; font-size: .43rem; }
+.planning-progress > div > span.locked { background: rgba(184, 151, 75, .13); border-color: rgba(222, 190, 113, .3); }
+.planning-progress > div > span.locked > b { color: #dfc47f; }
+.planning-wait { padding-top: 1rem; }
+.planning-wait .planning-progress { width: calc(100% + 2rem); place-items: stretch; text-align: left; }
+@keyframes realm-planning-pulse { 70% { box-shadow: 0 0 0 .45rem rgba(226, 193, 109, 0); } 100% { box-shadow: 0 0 0 0 rgba(226, 193, 109, 0); } }
 .waiting { place-items: center; padding: 1.6rem 1rem; text-align: center; }
 .waiting > span, .victory > span { color: #a98642; font-size: 2rem; }
 .victory { place-items: center; text-align: center; }

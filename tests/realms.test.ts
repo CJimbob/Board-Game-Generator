@@ -54,6 +54,32 @@ test("keeps opposing orders and leader hands secret during planning", () => {
   assert.equal(view.players.find((player) => player.id === host.id)?.leaderHand.length, 7);
 });
 
+test("all human factions plan simultaneously and reveal only after the final lock", () => {
+  const { state, host } = createRealmState("SYNC", "同时规划者", 2);
+  state.players.forEach((player) => { player.isBot = false; });
+  startRealmGame(state, host.id);
+  assert.equal(state.phase, "planning");
+  assert.equal(state.currentPlayerId, null);
+
+  const ordersFor = (faction: string | null) => {
+    const occupied = REALM_AREAS.filter((area) => state.areas[area.key].units.some((unit) => unit.faction === faction));
+    const orders: RealmOrderType[] = ["raid", "march_minus", "defend", "support", "power"];
+    return Object.fromEntries(occupied.map((area, index) => [area.key, orders[index]])) as Record<string, RealmOrderType>;
+  };
+
+  submitRealmOrders(state, state.players[0].id, ordersFor(state.players[0].faction));
+  submitRealmOrders(state, state.players[1].id, ordersFor(state.players[1].faction));
+  assert.equal(state.phase, "planning");
+  assert.equal(state.currentPlayerId, null);
+  assert.equal(state.players.filter((player) => player.submitted).length, 2);
+  const hiddenView = publicRealmView(state, state.players[0].id);
+  const rivalArea = REALM_AREAS.find((area) => state.areas[area.key].units.some((unit) => unit.faction === state.players[1].faction))!;
+  assert.equal(hiddenView.areas[rivalArea.key].order, "hidden");
+
+  submitRealmOrders(state, state.players[2].id, ordersFor(state.players[2].faction));
+  assert.notEqual(state.phase, "planning");
+});
+
 test("validates the physical order inventory on the server", () => {
   const { state, host } = createRealmState("ORDR", "下令者", 2);
   startRealmGame(state, host.id);
