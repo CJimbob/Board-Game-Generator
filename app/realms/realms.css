@@ -600,8 +600,23 @@
   .realm-track-overview .board-influence ol { grid-template-columns: repeat(6, minmax(1.35rem, 1fr)); }
   .realm-track-overview .board-influence li { justify-content: center; padding: 0 .2rem; }
   .realm-map-wrap { min-height: 0; height: auto; flex: 0 0 auto; }
-  .realm-map-shell { height: auto; display: block; overflow: hidden; }
+  .realm-map-shell { position: relative; height: auto; display: block; overflow: hidden; }
   .realm-map-viewport { height: auto; min-height: 0; }
+  .map-selection-dock {
+    position: absolute;
+    z-index: 60;
+    left: 1rem;
+    right: 1rem;
+    bottom: 1rem;
+    grid-template-columns: minmax(6rem, .7fr) minmax(7rem, .8fr) minmax(10rem, 1.25fr) auto;
+    gap: .45rem;
+    padding: .5rem .6rem;
+    background: rgba(13, 35, 40, .92);
+    border: 1px solid color-mix(in srgb, var(--owner) 58%, #d2b873);
+    border-left: 4px solid var(--owner);
+    box-shadow: 0 10px 30px rgba(2, 13, 17, .48);
+    backdrop-filter: blur(8px);
+  }
   .realm-below-map { position: static; top: auto; min-height: 0; height: 100%; max-height: none; scrollbar-gutter: stable; }
 }
 

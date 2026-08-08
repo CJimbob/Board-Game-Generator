@@ -74,6 +74,8 @@ test("ships the complete online realm-war surface and bilingual rulebook", async
   assert.match(styles, /repeat\(auto-fit, minmax\(1\.15rem, 1fr\)\)/);
   assert.match(styles, /@media \(min-width: 900px\)/);
   assert.match(styles, /grid-template-columns:\s*repeat\(6, minmax\(0, 1fr\)\)/);
+  assert.match(styles, /\.map-selection-dock \{[\s\S]*?position:\s*absolute/);
+  assert.match(styles, /backdrop-filter:\s*blur\(8px\)/);
   assert.match(styles, /realms-board-v3-hidpi/);
   assert.match(styles, /@media/);
   assert.match(route, /loadRoomRecord<RealmState>/);
