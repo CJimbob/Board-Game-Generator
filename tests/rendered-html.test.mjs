@@ -65,6 +65,9 @@ test("ships the complete online realm-war surface and bilingual rulebook", async
   assert.doesNotMatch(client, /state\.order === "hidden" \? "\?"/);
   assert.match(client, /unit-glyph/);
   assert.match(client, /footman: "F", knight: "K", ship: "S", siege: "G"/);
+  assert.match(client, /LeaderHandShelf/);
+  assert.match(client, /我的领袖牌/);
+  assert.match(client, /仅你可见 · 战斗时从正式面板选择/);
   assert.match(client, /rotateMapPoint/);
   assert.match(client, /退出战局/);
   assert.match(client, /LAST_RECOVERY_KEY/);

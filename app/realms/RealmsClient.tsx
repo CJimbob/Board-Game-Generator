@@ -247,7 +247,7 @@ function RealmTable({ game, session, language, act, busy, error, onRules, onLang
       </section>
       <section className="realm-below-map">
         <div className="realm-status-stack"><section className="realm-phase"><div><small>{text("当前阶段", "Current phase")}</small><strong>{(PHASE_LABELS[game.phase] ?? [game.phase, game.phase])[language === "zh" ? 0 : 1]}</strong></div><p>{current ? text(`等待 ${current.name} 决定`, `Waiting for ${current.name}`) : game.phase === "planning" ? text("所有势力同时秘密下令", "All factions assign orders simultaneously") : text("服务器正在结算", "Resolving on the server")}</p><div className="wildling-meter"><span>{text("荒境威胁", "Frontier threat")}</span><b>{game.wildlingThreat}/12</b></div></section><PlayerRibbon game={game} language={language} act={act} /></div>
-        <aside className="realm-command"><ActionPanel game={game} me={me} language={language} act={act} busy={busy} selectedAreaId={selectedAreaId} onSelectArea={selectActionArea} />{error && <p className="realm-error">{error}</p>}<Chronicle game={game} language={language} /></aside>
+        <aside className="realm-command"><LeaderHandShelf game={game} me={me} language={language} /><ActionPanel game={game} me={me} language={language} act={act} busy={busy} selectedAreaId={selectedAreaId} onSelectArea={selectActionArea} />{error && <p className="realm-error">{error}</p>}<Chronicle game={game} language={language} /></aside>
       </section>
     </div>
     {rulesOpen && <RulesModal language={language} onClose={closeRules} />}
@@ -258,6 +258,16 @@ function PlayerRibbon({ game, language, act }: { game: Game; language: Language;
   const text = (zh: string, en: string) => language === "zh" ? zh : en;
   const isHost = game.viewerId === game.hostId;
   return <div className="realm-players">{game.players.map((player) => { const faction = game.factions.find((item) => item.key === player.faction); const active = game.currentPlayerId === player.id; return <article key={player.id} className={active ? "active" : ""} style={{ "--faction": faction?.color ?? "#777" } as CSSProperties}><i /><div><strong>{player.name}{player.isBot ? " · AI" : !player.isOnline ? text(" · 断线", " · offline") : ""}</strong><small>{faction ? (language === "zh" ? faction.name : faction.nameEn) : text("等待分配", "Unassigned")}</small></div><b>♜ {player.castles}/7</b><span>◆ {player.power} · ▰ {player.supply}</span>{game.phase === "planning" && <em>{player.submitted ? text("已封存", "Locked") : text("下令中", "Planning")}</em>}{isHost && game.phase !== "lobby" && game.phase !== "finished" && player.id !== game.viewerId && !player.isBot && !player.isOnline && <button className="realm-entrust" onClick={() => act("entrust", { targetPlayerId: player.id })}>{text("交给 AI", "Entrust to AI")}</button>}</article>; })}</div>;
+}
+
+function LeaderHandShelf({ game, me, language }: { game: Game; me: Player; language: Language }) {
+  const leaders = me.leaderHand.map((key) => game.leaders.find((leader) => leader.key === key)).filter((leader): leader is Leader => Boolean(leader));
+  if (!leaders.length) return null;
+  return <section className="leader-hand-shelf" aria-label={language === "zh" ? "我的领袖牌" : "My leader hand"}>
+    <header><div><strong>{language === "zh" ? "我的领袖牌" : "My leader hand"}</strong><small>{language === "zh" ? "仅你可见 · 战斗时从正式面板选择" : "Private · choose from the battle panel"}</small></div><b>{leaders.length} / 7</b></header>
+    <div className="leader-hand-scroll">{leaders.map((leader) => <article key={leader.key} title={language === "zh" ? leader.text : leader.textEn}><b>{leader.strength}</b><strong>{language === "zh" ? leader.name : leader.nameEn}</strong><span>⚔ {leader.swords} · ▣ {leader.forts}</span><small>{language === "zh" ? leader.text : leader.textEn}</small></article>)}</div>
+    {me.leaderDiscard.length > 0 && <p>{language === "zh" ? `公开弃牌：${me.leaderDiscard.length} 张` : `Public discard: ${me.leaderDiscard.length}`}</p>}
+  </section>;
 }
 
 type MapPoint = [number, number];

@@ -489,6 +489,19 @@
 .map-inspector-units .unit-glyph { font-size: .86rem; }
 
 .realm-command { display: flex; flex-direction: column; gap: .8rem; }
+.leader-hand-shelf { display: grid; gap: .55rem; padding: .75rem; color: #eee4ca; background: linear-gradient(115deg, #172b30, #263b3c); border: 1px solid rgba(222, 197, 139, .3); box-shadow: 0 8px 20px rgba(31, 38, 35, .14); }
+.leader-hand-shelf > header { display: flex; align-items: center; justify-content: space-between; gap: .7rem; }
+.leader-hand-shelf > header > div { display: grid; gap: .1rem; }
+.leader-hand-shelf > header strong { color: #f0d995; font: 900 .78rem "Songti SC", STSong, Georgia, serif; }
+.leader-hand-shelf > header small { color: #a9b9b4; font-size: .48rem; }
+.leader-hand-shelf > header > b { color: #e5c978; font: 900 .7rem Georgia, serif; }
+.leader-hand-scroll { display: flex; gap: .4rem; overflow-x: auto; padding: .05rem 0 .25rem; scrollbar-color: #b29450 #172b30; scrollbar-width: thin; scroll-snap-type: x proximity; }
+.leader-hand-scroll article { min-width: 7.6rem; max-width: 7.6rem; min-height: 5.3rem; display: grid; grid-template-columns: 1.65rem 1fr; grid-template-rows: auto auto 1fr; gap: .08rem .4rem; padding: .5rem; color: #302f2a; background: #f4ead4; border: 1px solid #c8a85f; box-shadow: 0 3px 10px rgba(3, 16, 18, .32); scroll-snap-align: start; }
+.leader-hand-scroll article > b { grid-row: 1 / 4; display: grid; place-items: center; color: #fff8e8; background: #34484a; font: 900 1rem Georgia, serif; }
+.leader-hand-scroll article strong { overflow: hidden; font: 900 .62rem "Songti SC", STSong, Georgia, serif; text-overflow: ellipsis; white-space: nowrap; }
+.leader-hand-scroll article span { color: #775f31; font-size: .48rem; font-weight: 800; }
+.leader-hand-scroll article small { display: -webkit-box; overflow: hidden; color: #6d6659; font-size: .46rem; line-height: 1.35; -webkit-box-orient: vertical; -webkit-line-clamp: 2; }
+.leader-hand-shelf > p { margin: 0; color: #b9c4bf; font-size: .48rem; }
 .influence-card,
 .action-card,
 .realm-log { padding: 1rem; color: #302f2a; background: #ede4d2; border: 1px solid rgba(53, 51, 43, .22); box-shadow: 0 8px 20px rgba(52, 45, 34, .11); }
