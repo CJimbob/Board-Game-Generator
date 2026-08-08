@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties, type PointerEvent as ReactPointerEvent, type WheelEvent as ReactWheelEvent } from "react";
 
 type Language = "zh" | "en";
 type Session = { code: string; playerId: string; token: string; recoveryCode?: string };
@@ -193,15 +193,21 @@ function RealmTable({ game, session, language, act, busy, error, onRules, onLang
   const me = game.players.find((player) => player.id === game.viewerId)!;
   const ownAreas = ownUnitAreas(game, me.faction);
   const [selectedAreaId, setSelectedAreaId] = useState(ownAreas[0]?.key ?? "throne_city");
+  const [inspectedAreaId, setInspectedAreaId] = useState(ownAreas[0]?.key ?? "throne_city");
   const faction = game.factions.find((item) => item.key === me.faction);
   const current = game.players.find((player) => player.id === game.currentPlayerId);
   const host = game.players.find((player) => player.id === game.hostId);
   const selectableAreaIds = game.phase === "planning" ? ownAreas.map((area) => area.key) : [];
+  const selectActionArea = (areaId: string) => { setSelectedAreaId(areaId); setInspectedAreaId(areaId); };
+  const inspectArea = (areaId: string) => {
+    setInspectedAreaId(areaId);
+    if (!selectableAreaIds.length || selectableAreaIds.includes(areaId)) setSelectedAreaId(areaId);
+  };
   return <main className="realm-table" style={{ "--my-faction": faction?.color ?? "#b69655" } as CSSProperties}>
     <header className="realm-header"><div><Link href="/realms" className="realm-brand">✦ {text("六境争霸", "The Six Realms")}</Link><span>{text(`房间 ${game.code}`, `Room ${game.code}`)}</span><span>{text(`第 ${game.round}/10 轮`, `Round ${game.round}/10`)}</span></div><div>{game.viewerId !== game.hostId && host && !host.isBot && !host.isOnline && <button onClick={() => act("claimHost")}>{text("接任房主", "Take host")}</button>}<button onClick={() => navigator.clipboard.writeText(`${window.location.origin}/realms?room=${game.code}`)}>{text("复制邀请", "Copy invite")}</button>{session.recoveryCode && <button onClick={() => navigator.clipboard.writeText(session.recoveryCode!)}>{text(`恢复码 ${session.recoveryCode}`, `Recovery ${session.recoveryCode}`)}</button>}<button onClick={onLanguage}>{language === "zh" ? "EN" : "中文"}</button><button onClick={onRules}>{text("规则书", "Rules")}</button></div></header>
     <section className="realm-phase"><div><small>{text("当前阶段", "Current phase")}</small><strong>{(PHASE_LABELS[game.phase] ?? [game.phase, game.phase])[language === "zh" ? 0 : 1]}</strong></div><p>{current ? text(`等待 ${current.name} 决定`, `Waiting for ${current.name}`) : game.phase === "planning" ? text("所有势力同时秘密下令", "All factions assign orders simultaneously") : text("服务器正在结算", "Resolving on the server")}</p><div className="wildling-meter"><span>{text("荒境威胁", "Frontier threat")}</span><b>{game.wildlingThreat}/12</b></div></section>
     <PlayerRibbon game={game} language={language} act={act} />
-    <div className="realm-main-grid"><section className="realm-map-wrap"><RealmMap game={game} language={language} selectedKey={selectedAreaId} onSelect={setSelectedAreaId} selectableAreaIds={selectableAreaIds} /></section><aside className="realm-command"><ActionPanel game={game} me={me} language={language} act={act} busy={busy} selectedAreaId={selectedAreaId} onSelectArea={setSelectedAreaId} />{error && <p className="realm-error">{error}</p>}<Chronicle game={game} language={language} /></aside></div>
+    <div className="realm-main-grid"><section className="realm-map-wrap"><RealmMap game={game} language={language} inspectedKey={inspectedAreaId} actionKey={selectedAreaId} onInspect={inspectArea} selectableAreaIds={selectableAreaIds} /></section><aside className="realm-command"><ActionPanel game={game} me={me} language={language} act={act} busy={busy} selectedAreaId={selectedAreaId} onSelectArea={selectActionArea} />{error && <p className="realm-error">{error}</p>}<Chronicle game={game} language={language} /></aside></div>
     {rulesOpen && <RulesModal language={language} onClose={closeRules} />}
   </main>;
 }
@@ -253,10 +259,18 @@ function MapUnitPiece({ unit, color, language }: { unit: Unit; color?: string; l
   return <span className={`map-unit-piece ${unit.type} ${unit.routed ? "routed" : ""}`} style={{ "--unit-color": color ?? "#667" } as CSSProperties} title={label} aria-label={label}><i className="unit-shape" aria-hidden="true" /></span>;
 }
 
-function RealmMap({ game, language, selectedKey, onSelect, selectableAreaIds }: { game: Game; language: Language; selectedKey: string; onSelect: (areaId: string) => void; selectableAreaIds: string[] }) {
+function RealmMap({ game, language, inspectedKey, actionKey, onInspect, selectableAreaIds }: { game: Game; language: Language; inspectedKey: string; actionKey: string; onInspect: (areaId: string) => void; selectableAreaIds: string[] }) {
   const factionMap = new Map(game.factions.map((faction) => [faction.key, faction]));
-  const chooseArea = (areaId: string) => { if (!selectableAreaIds.length || selectableAreaIds.includes(areaId)) onSelect(areaId); };
-  const selectedDefinition = game.areaDefinitions.find((area) => area.key === selectedKey) ?? game.areaDefinitions[0];
+  const viewportRef = useRef<HTMLDivElement>(null);
+  const mapRef = useRef<HTMLDivElement>(null);
+  const dragRef = useRef({ pointerId: -1, x: 0, y: 0, left: 0, top: 0, moved: false });
+  const suppressClick = useRef(false);
+  const initialFocusDone = useRef(false);
+  const [zoom, setZoom] = useState(1);
+  const [dragging, setDragging] = useState(false);
+  const [showAllLabels, setShowAllLabels] = useState(false);
+  const [expanded, setExpanded] = useState(false);
+  const selectedDefinition = game.areaDefinitions.find((area) => area.key === inspectedKey) ?? game.areaDefinitions[0];
   const selectedState = selectedDefinition ? game.areas[selectedDefinition.key] : null;
   const selectedOwnerKey = selectedState?.units[0]?.faction ?? selectedState?.control;
   const selectedOwner = selectedOwnerKey ? factionMap.get(selectedOwnerKey) : null;
@@ -264,12 +278,99 @@ function RealmMap({ game, language, selectedKey, onSelect, selectableAreaIds }: 
   const regions = useMemo(() => game.areaDefinitions.filter((definition) => definition.kind !== "port"), [game.areaDefinitions]);
   const ports = useMemo(() => game.areaDefinitions.filter((definition) => definition.kind === "port"), [game.areaDefinitions]);
   const regionPolygons = useMemo(() => buildRegionPolygons(regions), [regions]);
+  const navigableAreas = useMemo(() => game.areaDefinitions.filter((definition) => !game.areas[definition.key].blocked), [game.areaDefinitions, game.areas]);
+  const actionRestricted = selectableAreaIds.length > 0;
+  const selectedIsActionable = !actionRestricted || selectableAreaIds.includes(selectedDefinition?.key ?? "");
+
+  const focusArea = useCallback((areaId: string, behavior: ScrollBehavior = "smooth") => {
+    const definition = game.areaDefinitions.find((area) => area.key === areaId);
+    const viewport = viewportRef.current;
+    const map = mapRef.current;
+    if (!definition || !viewport || !map) return;
+    viewport.scrollTo({
+      left: map.offsetLeft + map.offsetWidth * definition.x / 100 - viewport.clientWidth / 2,
+      top: map.offsetTop + map.offsetHeight * definition.y / 100 - viewport.clientHeight / 2,
+      behavior,
+    });
+  }, [game.areaDefinitions]);
+
+  const chooseArea = (areaId: string, focus = false) => {
+    if (suppressClick.current) return;
+    onInspect(areaId);
+    if (focus) requestAnimationFrame(() => focusArea(areaId));
+  };
+
+  const changeZoom = (nextValue: number) => {
+    const viewport = viewportRef.current;
+    const oldWidth = viewport?.scrollWidth ?? 1;
+    const oldHeight = viewport?.scrollHeight ?? 1;
+    const centerX = viewport ? (viewport.scrollLeft + viewport.clientWidth / 2) / oldWidth : .5;
+    const centerY = viewport ? (viewport.scrollTop + viewport.clientHeight / 2) / oldHeight : .5;
+    const next = Math.max(1, Math.min(1.8, Math.round(nextValue * 10) / 10));
+    setZoom(next);
+    requestAnimationFrame(() => {
+      if (!viewport) return;
+      viewport.scrollTo({ left: centerX * viewport.scrollWidth - viewport.clientWidth / 2, top: centerY * viewport.scrollHeight - viewport.clientHeight / 2 });
+    });
+  };
+
+  const beginPan = (event: ReactPointerEvent<HTMLDivElement>) => {
+    if (event.button !== 0) return;
+    const viewport = viewportRef.current;
+    if (!viewport) return;
+    dragRef.current = { pointerId: event.pointerId, x: event.clientX, y: event.clientY, left: viewport.scrollLeft, top: viewport.scrollTop, moved: false };
+    event.currentTarget.setPointerCapture(event.pointerId);
+  };
+
+  const panMap = (event: ReactPointerEvent<HTMLDivElement>) => {
+    const drag = dragRef.current;
+    const viewport = viewportRef.current;
+    if (!viewport || drag.pointerId !== event.pointerId) return;
+    const dx = event.clientX - drag.x;
+    const dy = event.clientY - drag.y;
+    if (!drag.moved && Math.hypot(dx, dy) < 5) return;
+    drag.moved = true;
+    setDragging(true);
+    viewport.scrollLeft = drag.left - dx;
+    viewport.scrollTop = drag.top - dy;
+    event.preventDefault();
+  };
+
+  const endPan = (event: ReactPointerEvent<HTMLDivElement>) => {
+    if (dragRef.current.pointerId !== event.pointerId) return;
+    if (dragRef.current.moved) {
+      suppressClick.current = true;
+      window.setTimeout(() => { suppressClick.current = false; }, 0);
+    }
+    dragRef.current.pointerId = -1;
+    setDragging(false);
+    if (event.currentTarget.hasPointerCapture(event.pointerId)) event.currentTarget.releasePointerCapture(event.pointerId);
+  };
+
+  const wheelZoom = (event: ReactWheelEvent<HTMLDivElement>) => {
+    if (!event.ctrlKey && !event.metaKey) return;
+    event.preventDefault();
+    changeZoom(zoom + (event.deltaY < 0 ? .1 : -.1));
+  };
+
+  useEffect(() => {
+    if (initialFocusDone.current || !inspectedKey) return;
+    initialFocusDone.current = true;
+    const frame = requestAnimationFrame(() => focusArea(inspectedKey, "auto"));
+    return () => cancelAnimationFrame(frame);
+  }, [focusArea, inspectedKey]);
+
+  useEffect(() => {
+    if (!expanded) return;
+    const handleKey = (event: KeyboardEvent) => { if (event.key === "Escape") setExpanded(false); };
+    window.addEventListener("keydown", handleKey);
+    return () => window.removeEventListener("keydown", handleKey);
+  }, [expanded]);
 
   const renderContents = (definition: AreaDefinition, inPort = false) => {
     const state = game.areas[definition.key];
     const units = state.units;
-    const selectable = !selectableAreaIds.length || selectableAreaIds.includes(definition.key);
-    return <span className="area-content" style={{ left: `${definition.x}%`, top: `${definition.y}%` }} role={inPort || !selectable ? undefined : "button"} tabIndex={inPort || !selectable ? undefined : 0} onClick={inPort || !selectable ? undefined : (event) => { event.stopPropagation(); chooseArea(definition.key); }} onKeyDown={inPort || !selectable ? undefined : (event) => { if (event.key === "Enter" || event.key === " ") { event.preventDefault(); chooseArea(definition.key); } }}>
+    return <span className="area-content" style={{ left: `${definition.x}%`, top: `${definition.y}%` }} role={inPort ? undefined : "button"} tabIndex={inPort ? undefined : 0} onClick={inPort ? undefined : (event) => { event.stopPropagation(); chooseArea(definition.key); }} onKeyDown={inPort ? undefined : (event) => { if (event.key === "Enter" || event.key === " ") { event.preventDefault(); chooseArea(definition.key); } }}>
       <strong>{language === "zh" ? definition.name : definition.nameEn}</strong>
       <span className="area-icons">{definition.castle && <i>♜{definition.castle}</i>}{definition.supply && <i>▰{definition.supply}</i>}{definition.power && <i>◆{definition.power}</i>}{state.blocked && <i className="blocked">⊘</i>}{state.neutral && !state.blocked && <i className="neutral">⚔{state.neutral}</i>}{state.garrison && !state.neutral && <i className="garrison">▣{state.garrison}</i>}</span>
       {units.length > 0 && <span className="area-units">{units.map((unit) => <MapUnitPiece key={unit.id} unit={unit} color={factionMap.get(unit.faction)?.color} language={language} />)}</span>}
@@ -277,38 +378,52 @@ function RealmMap({ game, language, selectedKey, onSelect, selectableAreaIds }: 
     </span>;
   };
 
-  return <div className="realm-map" aria-label={language === "zh" ? "六境战争版图" : "Map of the Six Realms"}>
-    <div className="map-compass" aria-hidden="true">✦<small>N</small></div>
-    <div className="map-legend"><b>{language === "zh" ? "点击区域名称选择" : "Select by clicking a name"}</b><span>♜ {language === "zh" ? "城堡" : "Castle"}</span><span>▰ {language === "zh" ? "补给" : "Supply"}</span><span>◆ {language === "zh" ? "威望" : "Power"}</span></div>
-    <svg className="realm-region-overlay" viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true">{regions.map((definition) => {
+  return <div className={`realm-map-shell ${expanded ? "expanded" : ""} ${showAllLabels ? "show-all-labels" : "compact-labels"}`}>
+    <header className="map-toolbar">
+      <div className="map-toolbar-copy"><strong>{language === "zh" ? "战争地图" : "War map"}</strong><span>{language === "zh" ? "拖动地图 · 滚轮浏览 · ⌘/Ctrl + 滚轮缩放" : "Drag to pan · scroll to browse · ⌘/Ctrl + wheel to zoom"}</span></div>
+      <label className="map-area-picker"><span>{language === "zh" ? "快速定位" : "Find area"}</span><select value={selectedDefinition?.key ?? ""} onChange={(event) => chooseArea(event.target.value, true)}>{navigableAreas.map((area) => <option key={area.key} value={area.key}>{language === "zh" ? area.name : area.nameEn}</option>)}</select></label>
+      <div className="map-tools" aria-label={language === "zh" ? "地图工具" : "Map tools"}>
+        <button onClick={() => changeZoom(zoom - .1)} disabled={zoom <= 1} aria-label={language === "zh" ? "缩小地图" : "Zoom out"}>−</button><output>{Math.round(zoom * 100)}%</output><button onClick={() => changeZoom(zoom + .1)} disabled={zoom >= 1.8} aria-label={language === "zh" ? "放大地图" : "Zoom in"}>＋</button>
+        <button onClick={() => focusArea(selectedDefinition.key)}>{language === "zh" ? "定位" : "Focus"}</button>
+        <button className={showAllLabels ? "active" : ""} onClick={() => setShowAllLabels((value) => !value)}>{showAllLabels ? (language === "zh" ? "精简地名" : "Fewer labels") : (language === "zh" ? "全部地名" : "All labels")}</button>
+        <button onClick={() => { setExpanded((value) => !value); requestAnimationFrame(() => focusArea(selectedDefinition.key, "auto")); }}>{expanded ? (language === "zh" ? "退出全屏" : "Exit full map") : (language === "zh" ? "全屏地图" : "Full map")}</button>
+      </div>
+    </header>
+    <div ref={viewportRef} className={`realm-map-viewport ${dragging ? "dragging" : ""}`} onPointerDown={beginPan} onPointerMove={panMap} onPointerUp={endPan} onPointerCancel={endPan} onWheel={wheelZoom}>
+      <div ref={mapRef} className="realm-map" style={{ width: `${zoom * 100}%` }} aria-label={language === "zh" ? "六境战争版图" : "Map of the Six Realms"}>
+        <div className="map-compass" aria-hidden="true">✦<small>N</small></div>
+        <svg className="realm-region-overlay" viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true">{regions.map((definition) => {
       const state = game.areas[definition.key];
       const owner = state.units[0]?.faction ?? state.control;
       const faction = owner ? factionMap.get(owner) : null;
-      return <polygon key={definition.key} className={`${definition.kind} ${state.blocked ? "blocked" : ""} ${selectedKey === definition.key ? "selected" : ""}`} points={regionPolygons[definition.key].map((point) => point.join(",")).join(" ")} style={{ "--region-owner": faction?.color ?? (definition.kind === "sea" ? "#4e8190" : "#b7a67d") } as CSSProperties} />;
-    })}</svg>
-    {regions.map((definition) => {
+      return <polygon key={definition.key} className={`${definition.kind} ${state.blocked ? "blocked" : ""} ${selectableAreaIds.includes(definition.key) ? "actionable" : ""} ${actionKey === definition.key ? "action-selected" : ""} ${inspectedKey === definition.key ? "inspected" : ""}`} points={regionPolygons[definition.key].map((point) => point.join(",")).join(" ")} style={{ "--region-owner": faction?.color ?? (definition.kind === "sea" ? "#4e8190" : "#b7a67d") } as CSSProperties} />;
+        })}</svg>
+        {regions.map((definition) => {
       const state = game.areas[definition.key];
       const owner = state.units[0]?.faction ?? state.control;
       const faction = owner ? factionMap.get(owner) : null;
       const path = regionPolygons[definition.key].map(([x, y]) => `${x}% ${y}%`).join(",");
-      return <article key={definition.key} className={`realm-area ${definition.kind} terrain-${AREA_TERRAIN[definition.key] ?? "plain"} ${state.blocked ? "blocked" : ""} ${state.order ? "has-order" : ""} ${selectableAreaIds.includes(definition.key) ? "selectable" : ""} ${selectedKey === definition.key ? "selected" : ""}`} style={{ "--owner": faction?.color ?? (definition.kind === "sea" ? "#3d7380" : "#9a8d70") } as CSSProperties}>
-        <button className="region-hit" style={{ clipPath: `polygon(${path})` }} onClick={() => chooseArea(definition.key)} disabled={state.blocked || Boolean(selectableAreaIds.length && !selectableAreaIds.includes(definition.key))} aria-label={language === "zh" ? definition.name : definition.nameEn} title={language === "zh" ? definition.name : definition.nameEn} />
+      const notable = Boolean(state.units.length || state.order || definition.castle || definition.supply || definition.power || state.neutral || state.garrison);
+      return <article key={definition.key} className={`realm-area ${definition.kind} terrain-${AREA_TERRAIN[definition.key] ?? "plain"} ${state.blocked ? "blocked" : ""} ${state.order ? "has-order" : ""} ${notable ? "notable" : "quiet"} ${selectableAreaIds.includes(definition.key) ? "selectable" : ""} ${actionKey === definition.key ? "action-selected" : ""} ${inspectedKey === definition.key ? "inspected" : ""}`} style={{ "--owner": faction?.color ?? (definition.kind === "sea" ? "#3d7380" : "#9a8d70") } as CSSProperties}>
+        <button className="region-hit" style={{ clipPath: `polygon(${path})` }} onClick={() => chooseArea(definition.key)} aria-label={language === "zh" ? `查看${definition.name}` : `Inspect ${definition.nameEn}`} title={language === "zh" ? definition.name : definition.nameEn} />
         {renderContents(definition)}
       </article>;
-    })}
-    {ports.map((definition) => {
+        })}
+        {ports.map((definition) => {
       const state = game.areas[definition.key];
       const owner = state.units[0]?.faction ?? state.control;
       const faction = owner ? factionMap.get(owner) : null;
-      return <button key={definition.key} className={`realm-port ${state.blocked ? "blocked" : ""} ${selectableAreaIds.includes(definition.key) ? "selectable" : ""} ${selectedKey === definition.key ? "selected" : ""}`} style={{ left: `${definition.x}%`, top: `${definition.y}%`, "--owner": faction?.color ?? "#806c4e" } as CSSProperties} onClick={() => chooseArea(definition.key)} disabled={state.blocked || Boolean(selectableAreaIds.length && !selectableAreaIds.includes(definition.key))}>{renderContents(definition, true)}</button>;
-    })}
-    <BoardTracks game={game} language={language} />
-    {selectedDefinition && selectedState && <aside className="map-inspector" style={{ "--owner": selectedOwner?.color ?? "#9a8d70" } as CSSProperties}>
-      <span>{kindLabel} · {selectedOwner ? (language === "zh" ? selectedOwner.name : selectedOwner.nameEn) : (language === "zh" ? "未控制" : "Uncontrolled")}</span>
-      <strong>{language === "zh" ? selectedDefinition.name : selectedDefinition.nameEn}</strong>
-      {selectedState.units.length > 0 && <div className="map-inspector-units">{selectedState.units.map((unit) => <MapUnitPiece key={unit.id} unit={unit} color={factionMap.get(unit.faction)?.color} language={language} />)}</div>}
-      <small>{language === "zh" ? "相邻" : "Adjacent"}: {selectedDefinition.adjacent.map((id) => areaName(game, id, language)).join(" · ")}</small>
-    </aside>}
+      return <button key={definition.key} className={`realm-port ${state.blocked ? "blocked" : ""} ${selectableAreaIds.includes(definition.key) ? "selectable" : ""} ${actionKey === definition.key ? "action-selected" : ""} ${inspectedKey === definition.key ? "inspected" : ""}`} style={{ left: `${definition.x}%`, top: `${definition.y}%`, "--owner": faction?.color ?? "#806c4e" } as CSSProperties} onClick={() => chooseArea(definition.key)}>{renderContents(definition, true)}</button>;
+        })}
+      </div>
+    </div>
+    {selectedDefinition && selectedState && <section className="map-selection-dock" style={{ "--owner": selectedOwner?.color ?? "#9a8d70" } as CSSProperties}>
+      <div className="map-selection-title"><span>{kindLabel} · {selectedOwner ? (language === "zh" ? selectedOwner.name : selectedOwner.nameEn) : (language === "zh" ? "未控制" : "Uncontrolled")}</span><strong>{language === "zh" ? selectedDefinition.name : selectedDefinition.nameEn}</strong></div>
+      <div className="map-selection-status">{selectedState.units.length > 0 && <div className="map-inspector-units">{selectedState.units.map((unit) => <MapUnitPiece key={unit.id} unit={unit} color={factionMap.get(unit.faction)?.color} language={language} />)}</div>}<div className="map-resource-chips">{selectedDefinition.castle && <i>♜ {selectedDefinition.castle}</i>}{selectedDefinition.supply && <i>▰ {selectedDefinition.supply}</i>}{selectedDefinition.power && <i>◆ {selectedDefinition.power}</i>}{selectedState.neutral && <i>⚔ {selectedState.neutral}</i>}{selectedState.garrison && <i>▣ {selectedState.garrison}</i>}{selectedState.order && <i>{selectedState.order === "hidden" ? "?" : ORDER_LABELS[selectedState.order as Order][language === "zh" ? 0 : 1]}</i>}</div></div>
+      <div className="map-adjacent"><small>{language === "zh" ? "相邻区域" : "Adjacent areas"}</small><div>{selectedDefinition.adjacent.map((id) => <button key={id} onClick={() => chooseArea(id, true)}>{areaName(game, id, language)}</button>)}</div></div>
+      <div className={`map-action-state ${selectedIsActionable ? "ready" : "inspect-only"}`}>{selectedIsActionable ? (actionRestricted ? (language === "zh" ? "✓ 已设为当前下令区域" : "✓ Current order area") : (language === "zh" ? "可操作区域" : "Action available")) : (language === "zh" ? "仅查看 · 当前阶段不能在此行动" : "Inspect only · unavailable this phase")}</div>
+    </section>}
+    <details className="map-track-drawer"><summary>{language === "zh" ? "查看回合、胜利与三条影响力轨道" : "View round, victory, and influence tracks"}</summary><BoardTracks game={game} language={language} /></details>
   </div>;
 }
 
