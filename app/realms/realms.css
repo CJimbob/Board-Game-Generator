@@ -406,8 +406,8 @@
 .map-unit-piece.siege .unit-shape::before { content: ""; position: absolute; left: .14rem; right: .14rem; bottom: .25rem; height: .36rem; background: currentColor; clip-path: polygon(10% 0, 88% 0, 100% 100%, 0 100%); }
 .map-unit-piece.siege .unit-shape::after { content: ""; position: absolute; width: .16rem; height: .88rem; left: .48rem; top: -.03rem; background: currentColor; border-radius: .08rem; transform: rotate(47deg); transform-origin: bottom center; box-shadow: 0 -.08rem 0 .07rem currentColor; }
 .map-unit-piece.routed { transform: rotate(90deg); filter: grayscale(.8) drop-shadow(0 1px 0 rgba(0,0,0,.25)); opacity: .58; }
-.map-order { position: absolute; left: calc(100% - .25rem); top: calc(100% - .2rem); max-width: 4.8rem; padding: .18rem .3rem; color: #f7eed7; background: #222b29; border: 1px solid #d5bd7d; border-radius: 50%; box-shadow: 0 2px 6px rgba(5, 13, 13, .38); font-size: .42rem; font-style: normal; font-weight: 800; text-align: center; text-shadow: none; }
-.map-order.hidden { width: 1.4rem; height: 1.4rem; display: grid; place-items: center; color: #e7cb84; font-size: .72rem; }
+.map-order { position: relative; left: auto; top: auto; width: max-content; max-width: 4.8rem; justify-self: start; margin-top: .12rem; padding: .18rem .3rem; color: #f7eed7; background: #222b29; border: 1px solid #d5bd7d; border-radius: 2px; box-shadow: 0 2px 6px rgba(5, 13, 13, .38); font-size: .42rem; font-style: normal; font-weight: 800; text-align: center; text-shadow: none; }
+.map-order.hidden { display: block; color: #182124; background: #e2c978; border-color: #fff0ba; box-shadow: 0 0 0 2px rgba(226, 201, 120, .2), 0 3px 8px rgba(5, 13, 13, .42); font-size: .44rem; letter-spacing: .08em; }
 .realm-port {
   --owner: #806c4e;
   position: absolute;
@@ -430,7 +430,7 @@
 .realm-port .area-content strong { width: 5rem; text-align: center; font-size: .46rem; }
 .realm-port .area-icons { display: none; }
 .realm-port .area-units { position: absolute; bottom: 1.8rem; left: 1.45rem; min-width: 5rem; }
-.realm-port .map-order { left: 1.3rem; top: 1.3rem; }
+.realm-port .map-order { left: auto; top: auto; }
 .map-selection-dock {
   --owner: #9a8d70;
   display: grid;
@@ -449,6 +449,7 @@
 .map-selection-status { min-width: 0; display: flex; gap: .5rem; align-items: center; }
 .map-resource-chips { display: flex; gap: .24rem; flex-wrap: wrap; }
 .map-resource-chips i { padding: .18rem .3rem; color: #dcc98f; background: rgba(255,255,255,.055); border: 1px solid rgba(224, 199, 135, .18); border-radius: 2px; font-size: .48rem; font-style: normal; font-weight: 800; }
+.map-resource-chips .sealed-order-chip { color: #182124; background: #e2c978; border-color: #fff0ba; }
 .map-adjacent { min-width: 0; display: grid; gap: .25rem; }
 .map-adjacent small { color: #91a6a1; font-size: .45rem; letter-spacing: .09em; text-transform: uppercase; }
 .map-adjacent > div { display: flex; gap: .24rem; overflow-x: auto; padding-bottom: .12rem; }

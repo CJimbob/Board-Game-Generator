@@ -61,6 +61,8 @@ test("ships the complete online realm-war surface and bilingual rulebook", async
   assert.match(client, /realm-track-overview/);
   assert.match(client, /realm-board-column/);
   assert.doesNotMatch(client, /tracksOpen/);
+  assert.match(client, /已放置密令 · 全员封存后揭示/);
+  assert.doesNotMatch(client, /state\.order === "hidden" \? "\?"/);
   assert.match(client, /rotateMapPoint/);
   assert.match(client, /退出战局/);
   assert.match(client, /LAST_RECOVERY_KEY/);
