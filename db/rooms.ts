@@ -3,8 +3,9 @@ import type { GameState, MatchHistorySummary } from "@/lib/game";
 
 type RoomRow = { state: string; revision: number };
 type PresenceRow = { player_id: string; last_seen_at: string; online: number };
+type StoredRoomState = { code: string };
 
-export type RoomRecord = { state: GameState; revision: number };
+export type RoomRecord<T extends StoredRoomState = GameState> = { state: T; revision: number };
 export type PresenceMap = Record<string, { online: boolean; lastSeenAt: string }>;
 
 let schemaReady: Promise<void> | null = null;
@@ -72,20 +73,20 @@ async function ensureSchema() {
   return env.DB;
 }
 
-export async function loadRoomRecord(code: string): Promise<RoomRecord | null> {
+export async function loadRoomRecord<T extends StoredRoomState = GameState>(code: string): Promise<RoomRecord<T> | null> {
   const db = await ensureSchema();
   const row = await db
     .prepare("SELECT state, revision FROM game_rooms WHERE code = ? AND updated_at >= datetime('now', '-7 days')")
     .bind(code)
     .first<RoomRow>();
-  return row ? { state: JSON.parse(row.state) as GameState, revision: row.revision } : null;
+  return row ? { state: JSON.parse(row.state) as T, revision: row.revision } : null;
 }
 
 export async function loadRoom(code: string): Promise<GameState | null> {
   return (await loadRoomRecord(code))?.state ?? null;
 }
 
-export async function insertRoom(state: GameState) {
+export async function insertRoom(state: StoredRoomState) {
   const db = await ensureSchema();
   const result = await db
     .prepare(
@@ -96,7 +97,7 @@ export async function insertRoom(state: GameState) {
   return result.meta.changes === 1;
 }
 
-export async function saveRoom(state: GameState, expectedRevision: number) {
+export async function saveRoom(state: StoredRoomState, expectedRevision: number) {
   const db = await ensureSchema();
   const result = await db
     .prepare(

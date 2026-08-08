@@ -33,3 +33,24 @@ test("ships the game surface and social preview", async () => {
   assert.match(layout, /\/og\.png/);
   assert.doesNotMatch(page + client + layout + packageJson, /codex-preview|react-loading-skeleton/i);
 });
+
+test("ships the complete online realm-war surface and bilingual rulebook", async () => {
+  const [page, client, styles, route] = await Promise.all([
+    readFile(new URL("../app/realms/page.tsx", import.meta.url), "utf8"),
+    readFile(new URL("../app/realms/RealmsClient.tsx", import.meta.url), "utf8"),
+    readFile(new URL("../app/realms/realms.css", import.meta.url), "utf8"),
+    readFile(new URL("../app/api/realms/route.ts", import.meta.url), "utf8"),
+  ]);
+  assert.match(page, /<RealmsClient\s*\/>/);
+  assert.match(client, /六境争霸/);
+  assert.match(client, /秘密下令/);
+  assert.match(client, /影响力竞价/);
+  assert.match(client, /完整规则/);
+  assert.match(client, /The Six Realms/);
+  assert.match(client, /战争纪事/);
+  assert.match(client, /playTone/);
+  assert.match(styles, /\.realm-map/);
+  assert.match(styles, /@media/);
+  assert.match(route, /loadRoomRecord<RealmState>/);
+  assert.match(route, /saveOrConflict/);
+});

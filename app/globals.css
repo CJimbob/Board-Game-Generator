@@ -31,6 +31,26 @@ button, input, select { font: inherit; }
 button { cursor: pointer; }
 button:disabled { cursor: not-allowed; opacity: 0.46; }
 
+.realms-entry-link {
+  display: flex;
+  align-items: center;
+  gap: .8rem;
+  margin-top: .7rem;
+  padding: .85rem 1rem;
+  color: #f8f0df;
+  background: linear-gradient(120deg, #1d2b43, #354563);
+  border: 1px solid rgba(232, 202, 131, .38);
+  border-radius: 3px;
+  text-decoration: none;
+  box-shadow: 0 10px 24px rgba(11, 19, 33, .16);
+}
+.realms-entry-link > span { color: var(--gold-light); font-size: 1.4rem; }
+.realms-entry-link > div { display: grid; flex: 1; gap: .1rem; }
+.realms-entry-link strong { font: 800 .82rem "Songti SC", "STSong", Georgia, serif; }
+.realms-entry-link small { color: rgba(248, 240, 223, .62); font-size: .62rem; }
+.realms-entry-link > b { color: var(--gold-light); transition: transform .18s ease; }
+.realms-entry-link:hover > b { transform: translateX(.25rem); }
+
 .reference-link {
   display: inline;
   max-width: 100%;

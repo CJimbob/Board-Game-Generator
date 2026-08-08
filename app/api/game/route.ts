@@ -43,6 +43,7 @@ import {
   loadRoomRecord,
   saveRoom,
   touchPresence,
+  type RoomRecord,
 } from "@/db/rooms";
 
 export const dynamic = "force-dynamic";
@@ -163,7 +164,7 @@ function failure(error: unknown, status = 400) {
   return NextResponse.json({ error: message }, { status });
 }
 
-function requireCurrentRoom(record: Awaited<ReturnType<typeof loadRoomRecord>>) {
+function requireCurrentRoom(record: RoomRecord<GameState> | null) {
   if (!record) throw new Error("没有找到这个房间，房间可能已超过 7 天未活动。 ");
   if (!record.state.rulesetKey) throw new Error("这个房间来自旧版本，请回到首页创建新房间。 ");
   return record;
