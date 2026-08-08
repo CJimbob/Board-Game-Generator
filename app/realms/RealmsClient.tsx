@@ -58,6 +58,7 @@ type Game = {
 };
 
 const SESSION_KEY = "six-realms-session-v1";
+const LAST_RECOVERY_KEY = "six-realms-last-recovery-v1";
 const LANGUAGE_KEY = "six-realms-language";
 const ORDER_LABELS: Record<Order, [string, string]> = {
   raid: ["突袭", "Raid"], raid_star: ["★突袭", "★ Raid"],
@@ -84,6 +85,10 @@ const EVENT_LABELS: Record<string, [string, string]> = {
 
 function readSession() {
   try { return JSON.parse(localStorage.getItem(SESSION_KEY) ?? "null") as Session | null; } catch { return null; }
+}
+
+function readLastRecovery() {
+  try { return JSON.parse(localStorage.getItem(LAST_RECOVERY_KEY) ?? "null") as Pick<Session, "code" | "recoveryCode"> | null; } catch { return null; }
 }
 
 function playTone(kind: "click" | "battle" | "turn") {
@@ -118,9 +123,17 @@ export function RealmsClient() {
     const timer = window.setTimeout(() => {
       setLanguage((localStorage.getItem(LANGUAGE_KEY) as Language) || "zh");
       const saved = readSession();
-      if (saved) { setSession(saved); setCode(saved.code); }
-      const room = new URLSearchParams(window.location.search).get("room");
-      if (room) setCode(room.toUpperCase().slice(0, 4));
+      const invitedRoom = new URLSearchParams(window.location.search).get("room")?.toUpperCase().replace(/[^A-Z0-9]/g, "").slice(0, 4);
+      if (invitedRoom) {
+        setCode(invitedRoom);
+        if (saved?.code === invitedRoom) setSession(saved);
+        else if (saved?.recoveryCode) localStorage.setItem(LAST_RECOVERY_KEY, JSON.stringify({ code: saved.code, recoveryCode: saved.recoveryCode }));
+      } else if (saved) {
+        setSession(saved); setCode(saved.code);
+      } else {
+        const remembered = readLastRecovery();
+        if (remembered) { setCode(remembered.code); setRecovery(remembered.recoveryCode ?? ""); }
+      }
     }, 0);
     return () => window.clearTimeout(timer);
   }, []);
@@ -178,6 +191,25 @@ export function RealmsClient() {
     setLanguage(next); localStorage.setItem(LANGUAGE_KEY, next);
   };
 
+  const exitToLobby = useCallback(() => {
+    if (!session) return;
+    const message = game?.phase === "finished"
+      ? text("开始一场新战局？当前战局的恢复码会为你保留。", "Start a new campaign? This campaign's recovery code will be kept for you.")
+      : text("退出当前战局并返回创建页面？你的席位仍会保留，可用恢复码回来。", "Leave this campaign and return to setup? Your seat will remain recoverable with its recovery code.");
+    if (!window.confirm(message)) return;
+    if (session.recoveryCode) {
+      localStorage.setItem(LAST_RECOVERY_KEY, JSON.stringify({ code: session.code, recoveryCode: session.recoveryCode }));
+      setRecovery(session.recoveryCode);
+    }
+    localStorage.removeItem(SESSION_KEY);
+    setCode(session.code);
+    setSession(null);
+    setGame(null);
+    setError("");
+    previousPhase.current = "";
+    window.history.replaceState({}, "", "/realms");
+  }, [session, game?.phase, text]);
+
   if (!game) return <main className="realms-landing">
     <nav className="realm-nav"><Link href="/">← {text("双游戏大厅", "Game hall")}</Link><button onClick={changeLanguage}>{language === "zh" ? "EN" : "中文"}</button><button onClick={() => setRulesOpen(true)}>{text("完整规则", "Full rules")}</button></nav>
     <section className="realm-hero"><div className="realm-kicker">THE SIX REALMS</div><div className="realm-sigil">✦</div><h1>{text("六境争霸", "The Six Realms")}</h1><p>{text("秘密下令，公开结盟，在十轮战争中夺取七座城堡。", "Issue secret orders, forge public alliances, and claim seven castles before the tenth round ends.")}</p><div className="realm-pill-row"><span>{text("3–6 人", "3–6 players")}</span><span>{text("完整命令系统", "Complete order system")}</span><span>{text("联网保存", "Persistent online rooms")}</span><span>{text("策略电脑", "Strategic AI")}</span></div></section>
@@ -185,10 +217,10 @@ export function RealmsClient() {
     {rulesOpen && <RulesModal language={language} onClose={() => setRulesOpen(false)} />}
   </main>;
 
-  return <RealmTable game={game} session={session!} language={language} act={act} busy={busy} error={error} onRules={() => setRulesOpen(true)} onLanguage={changeLanguage} rulesOpen={rulesOpen} closeRules={() => setRulesOpen(false)} />;
+  return <RealmTable game={game} session={session!} language={language} act={act} busy={busy} error={error} onRules={() => setRulesOpen(true)} onLanguage={changeLanguage} onExit={exitToLobby} rulesOpen={rulesOpen} closeRules={() => setRulesOpen(false)} />;
 }
 
-function RealmTable({ game, session, language, act, busy, error, onRules, onLanguage, rulesOpen, closeRules }: { game: Game; session: Session; language: Language; act: (action: string, payload?: Record<string, unknown>) => void; busy: boolean; error: string; onRules: () => void; onLanguage: () => void; rulesOpen: boolean; closeRules: () => void }) {
+function RealmTable({ game, session, language, act, busy, error, onRules, onLanguage, onExit, rulesOpen, closeRules }: { game: Game; session: Session; language: Language; act: (action: string, payload?: Record<string, unknown>) => void; busy: boolean; error: string; onRules: () => void; onLanguage: () => void; onExit: () => void; rulesOpen: boolean; closeRules: () => void }) {
   const text = (zh: string, en: string) => language === "zh" ? zh : en;
   const me = game.players.find((player) => player.id === game.viewerId)!;
   const ownAreas = ownUnitAreas(game, me.faction);
@@ -204,7 +236,7 @@ function RealmTable({ game, session, language, act, busy, error, onRules, onLang
     if (!selectableAreaIds.length || selectableAreaIds.includes(areaId)) setSelectedAreaId(areaId);
   };
   return <main className="realm-table" style={{ "--my-faction": faction?.color ?? "#b69655" } as CSSProperties}>
-    <header className="realm-header"><div><Link href="/realms" className="realm-brand">✦ {text("六境争霸", "The Six Realms")}</Link><span>{text(`房间 ${game.code}`, `Room ${game.code}`)}</span><span>{text(`第 ${game.round}/10 轮`, `Round ${game.round}/10`)}</span></div><div>{game.viewerId !== game.hostId && host && !host.isBot && !host.isOnline && <button onClick={() => act("claimHost")}>{text("接任房主", "Take host")}</button>}<Link className="realm-hub-link" href="/">{text("游戏大厅", "Game hall")}</Link><button onClick={() => navigator.clipboard.writeText(`${window.location.origin}/realms?room=${game.code}`)}>{text("复制邀请", "Copy invite")}</button>{session.recoveryCode && <button onClick={() => navigator.clipboard.writeText(session.recoveryCode!)}>{text(`恢复码 ${session.recoveryCode}`, `Recovery ${session.recoveryCode}`)}</button>}<button onClick={onLanguage}>{language === "zh" ? "EN" : "中文"}</button><button onClick={onRules}>{text("规则书", "Rules")}</button></div></header>
+    <header className="realm-header"><div><Link href="/realms" className="realm-brand">✦ {text("六境争霸", "The Six Realms")}</Link><span>{text(`房间 ${game.code}`, `Room ${game.code}`)}</span><span>{text(`第 ${game.round}/10 轮`, `Round ${game.round}/10`)}</span></div><div>{game.viewerId !== game.hostId && host && !host.isBot && !host.isOnline && <button onClick={() => act("claimHost")}>{text("接任房主", "Take host")}</button>}<Link className="realm-hub-link" href="/">{text("游戏大厅", "Game hall")}</Link><button onClick={() => navigator.clipboard.writeText(`${window.location.origin}/realms?room=${game.code}`)}>{text("复制邀请", "Copy invite")}</button>{session.recoveryCode && <button onClick={() => navigator.clipboard.writeText(session.recoveryCode!)}>{text(`恢复码 ${session.recoveryCode}`, `Recovery ${session.recoveryCode}`)}</button>}<button onClick={onLanguage}>{language === "zh" ? "EN" : "中文"}</button><button onClick={onRules}>{text("规则书", "Rules")}</button><button className="realm-exit" onClick={onExit}>{text(game.phase === "finished" ? "新建战局" : "退出战局", game.phase === "finished" ? "New campaign" : "Leave campaign")}</button></div></header>
     <section className="realm-phase"><div><small>{text("当前阶段", "Current phase")}</small><strong>{(PHASE_LABELS[game.phase] ?? [game.phase, game.phase])[language === "zh" ? 0 : 1]}</strong></div><p>{current ? text(`等待 ${current.name} 决定`, `Waiting for ${current.name}`) : game.phase === "planning" ? text("所有势力同时秘密下令", "All factions assign orders simultaneously") : text("服务器正在结算", "Resolving on the server")}</p><div className="wildling-meter"><span>{text("荒境威胁", "Frontier threat")}</span><b>{game.wildlingThreat}/12</b></div></section>
     <PlayerRibbon game={game} language={language} act={act} />
     <div className="realm-main-grid"><section className="realm-map-wrap"><RealmMap game={game} language={language} inspectedKey={inspectedAreaId} actionKey={selectedAreaId} onInspect={inspectArea} selectableAreaIds={selectableAreaIds} /></section><aside className="realm-command"><ActionPanel game={game} me={me} language={language} act={act} busy={busy} selectedAreaId={selectedAreaId} onSelectArea={selectActionArea} />{error && <p className="realm-error">{error}</p>}<Chronicle game={game} language={language} /></aside></div>

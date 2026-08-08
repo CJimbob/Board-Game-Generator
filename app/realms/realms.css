@@ -134,6 +134,8 @@
 .realm-brand { color: #e4cd92; text-decoration: none; font: 900 1.05rem "Songti SC", STSong, Georgia, serif; }
 .realm-header button { padding: .42rem .65rem; font-size: .68rem; }
 .realm-hub-link { border: 1px solid rgba(230, 205, 145, .35); border-radius: 2px; padding: .42rem .65rem; color: #eadcb9; background: rgba(255, 255, 255, .035); font-size: .68rem; text-decoration: none; }
+.realm-header .realm-exit { color: #f0b4aa; border-color: rgba(226, 129, 114, .42); }
+.realm-header .realm-exit:hover { color: #fff1ed; background: rgba(185, 72, 57, .18); }
 
 .realm-phase {
   display: grid;
