@@ -237,6 +237,10 @@ function RealmTable({ game, session, language, act, busy, error, onRules, onLang
   };
   return <main className="realm-table" style={{ "--my-faction": faction?.color ?? "#b69655" } as CSSProperties}>
     <header className="realm-header"><div><Link href="/realms" className="realm-brand">✦ {text("六境争霸", "The Six Realms")}</Link><span>{text(`房间 ${game.code}`, `Room ${game.code}`)}</span><span>{text(`第 ${game.round}/10 轮`, `Round ${game.round}/10`)}</span></div><div>{game.viewerId !== game.hostId && host && !host.isBot && !host.isOnline && <button onClick={() => act("claimHost")}>{text("接任房主", "Take host")}</button>}<Link className="realm-hub-link" href="/">{text("游戏大厅", "Game hall")}</Link><button onClick={() => navigator.clipboard.writeText(`${window.location.origin}/realms?room=${game.code}`)}>{text("复制邀请", "Copy invite")}</button>{session.recoveryCode && <button onClick={() => navigator.clipboard.writeText(session.recoveryCode!)}>{text(`恢复码 ${session.recoveryCode}`, `Recovery ${session.recoveryCode}`)}</button>}<button onClick={onLanguage}>{language === "zh" ? "EN" : "中文"}</button><button onClick={onRules}>{text("规则书", "Rules")}</button><button className="realm-exit" onClick={onExit}>{text(game.phase === "finished" ? "新建战局" : "退出战局", game.phase === "finished" ? "New campaign" : "Leave campaign")}</button></div></header>
+    <section className="realm-track-overview" aria-label={text("战局总览", "Campaign overview")}>
+      <header><span className="track-summary-mark" aria-hidden="true">♜</span><span className="track-summary-copy"><strong>{text("战局总览", "Campaign overview")}</strong><small>{text(`第 ${game.round}/10 轮 · 荒境 ${game.wildlingThreat}/12 · 领先 ${Math.max(0, ...game.players.map((player) => player.castles))}/7 城堡`, `Round ${game.round}/10 · Frontier ${game.wildlingThreat}/12 · Leader ${Math.max(0, ...game.players.map((player) => player.castles))}/7 castles`)}</small></span><em>{text("固定显示", "Always visible")}</em></header>
+      <BoardTracks game={game} language={language} />
+    </section>
     <div className="realm-main-grid">
       <section className="realm-map-wrap"><RealmMap game={game} language={language} inspectedKey={inspectedAreaId} actionKey={selectedAreaId} onInspect={inspectArea} selectableAreaIds={selectableAreaIds} /></section>
       <section className="realm-below-map">
@@ -311,7 +315,6 @@ function RealmMap({ game, language, inspectedKey, actionKey, onInspect, selectab
   const [dragging, setDragging] = useState(false);
   const [showAllLabels, setShowAllLabels] = useState(false);
   const [expanded, setExpanded] = useState(false);
-  const [tracksOpen, setTracksOpen] = useState(true);
   const selectedDefinition = game.areaDefinitions.find((area) => area.key === inspectedKey) ?? game.areaDefinitions[0];
   const selectedState = selectedDefinition ? game.areas[selectedDefinition.key] : null;
   const selectedOwnerKey = selectedState?.units[0]?.faction ?? selectedState?.control;
@@ -490,7 +493,6 @@ function RealmMap({ game, language, inspectedKey, actionKey, onInspect, selectab
       <div className="map-adjacent"><small>{language === "zh" ? "相邻区域" : "Adjacent areas"}</small><div>{selectedDefinition.adjacent.map((id) => <button key={id} onClick={() => chooseArea(id, true)}>{areaName(game, id, language)}</button>)}</div></div>
       <div className={`map-action-state ${selectedIsActionable ? "ready" : "inspect-only"}`}>{selectedIsActionable ? (actionRestricted ? (language === "zh" ? "✓ 已设为当前下令区域" : "✓ Current order area") : (language === "zh" ? "可操作区域" : "Action available")) : (language === "zh" ? "仅查看 · 当前阶段不能在此行动" : "Inspect only · unavailable this phase")}</div>
     </section>}
-    <details className="map-track-drawer" open={tracksOpen} onToggle={(event) => setTracksOpen(event.currentTarget.open)}><summary><span className="track-summary-mark" aria-hidden="true">♜</span><span className="track-summary-copy"><strong>{language === "zh" ? "战局总览" : "Campaign overview"}</strong><small>{language === "zh" ? `第 ${game.round}/10 轮 · 荒境 ${game.wildlingThreat}/12 · 领先 ${Math.max(0, ...game.players.map((player) => player.castles))}/7 城堡` : `Round ${game.round}/10 · Frontier ${game.wildlingThreat}/12 · Leader ${Math.max(0, ...game.players.map((player) => player.castles))}/7 castles`}</small></span><span className="track-summary-action"><i className="track-open-label">{language === "zh" ? "展开轨道" : "Show tracks"}</i><i className="track-close-label">{language === "zh" ? "收起轨道" : "Hide tracks"}</i><b aria-hidden="true">⌄</b></span></summary><BoardTracks game={game} language={language} /></details>
   </div>;
 }
 

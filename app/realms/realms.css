@@ -182,11 +182,16 @@
 .realm-players em { position: absolute; right: .45rem; bottom: .2rem; color: #846a30; font-size: .5rem; font-style: normal; }
 .realm-entrust { position: absolute; right: .35rem; bottom: .18rem; border: 1px solid #9f7f44; border-radius: 2px; padding: .18rem .3rem; color: #7c2d2b; background: #fff1d5; font-size: .48rem; font-weight: 800; }
 
-.realm-main-grid { display: flex; flex-direction: column; gap: 1rem; padding: 1rem; }
-.realm-below-map { min-width: 0; display: grid; grid-template-columns: minmax(0, 1fr) minmax(22rem, 28rem); gap: 1rem; align-items: start; }
+.realm-track-overview { color: #d9cba9; background: linear-gradient(110deg, #10272c, #0d2025); border-bottom: 1px solid rgba(222, 197, 139, .34); }
+.realm-track-overview > header { min-height: 3.35rem; display: grid; grid-template-columns: auto minmax(0, 1fr) auto; gap: .7rem; align-items: center; padding: .65rem .85rem 0; color: #e6cf8f; }
+.realm-track-overview > header > em { color: #e0c778; font-size: .54rem; font-style: normal; font-weight: 900; letter-spacing: .08em; text-transform: uppercase; }
+.realm-main-grid { display: grid; grid-template-columns: minmax(0, 1fr) minmax(24rem, 30rem); gap: 1rem; align-items: start; padding: 1rem; }
+.realm-below-map { min-width: 0; display: flex; flex-direction: column; gap: .8rem; align-items: stretch; }
 .realm-status-stack { min-width: 0; display: grid; gap: .8rem; }
 .realm-below-map .realm-phase { border: 1px solid rgba(255, 255, 255, .08); }
-.realm-below-map .realm-players { border: 1px solid rgba(42, 47, 43, .18); }
+.realm-below-map .realm-phase { grid-template-columns: minmax(0, 1fr) auto; gap: .5rem; padding: .75rem; }
+.realm-below-map .realm-phase p { grid-column: 1 / -1; grid-row: 2; }
+.realm-below-map .realm-players { grid-template-columns: repeat(2, minmax(0, 1fr)); border: 1px solid rgba(42, 47, 43, .18); overflow: visible; }
 .realm-map-wrap { min-width: 0; overflow: hidden; background: #10252c; border: 1px solid #6d6657; box-shadow: 0 18px 42px rgba(22, 24, 22, .22); }
 .realm-map-shell { min-width: 0; color: #eee4ca; background: #0c2026; }
 .map-toolbar {
@@ -252,7 +257,7 @@
   z-index: 300;
   inset: .5rem;
   display: grid;
-  grid-template-rows: auto minmax(0, 1fr) auto auto;
+  grid-template-rows: auto minmax(0, 1fr) auto;
   overflow: hidden;
   border: 1px solid #a88b4e;
   box-shadow: 0 30px 120px rgba(0,0,0,.76);
@@ -451,21 +456,10 @@
 .map-action-state { max-width: 9rem; padding: .38rem .48rem; border-radius: 3px; font-size: .48rem; font-weight: 900; line-height: 1.35; text-align: center; }
 .map-action-state.ready { color: #dff1d8; background: rgba(91, 141, 79, .19); border: 1px solid rgba(132, 181, 115, .38); }
 .map-action-state.inspect-only { color: #d9c9ac; background: rgba(255,255,255,.045); border: 1px solid rgba(255,255,255,.11); }
-.map-track-drawer { color: #d9cba9; background: linear-gradient(110deg, #10272c, #0d2025); border-top: 1px solid rgba(222, 197, 139, .34); }
-.map-track-drawer > summary { min-height: 3.35rem; display: grid; grid-template-columns: auto minmax(0, 1fr) auto; gap: .7rem; align-items: center; padding: .65rem .85rem; cursor: pointer; color: #e6cf8f; list-style: none; border-bottom: 1px solid transparent; }
-.map-track-drawer > summary::-webkit-details-marker { display: none; }
-.map-track-drawer[open] > summary { border-bottom-color: rgba(222, 197, 139, .14); }
 .track-summary-mark { width: 2rem; height: 2rem; display: grid; place-items: center; color: #17262a; background: #dfc372; border: 1px solid #f6e4aa; border-radius: 50%; box-shadow: 0 0 0 3px rgba(223, 195, 114, .1); font-size: .9rem; }
 .track-summary-copy { min-width: 0; display: grid; gap: .12rem; }
 .track-summary-copy strong { color: #f5e5b7; font: 900 .78rem "Songti SC", STSong, Georgia, serif; letter-spacing: .06em; }
 .track-summary-copy small { overflow: hidden; color: #9fb3ad; font-size: .54rem; text-overflow: ellipsis; white-space: nowrap; }
-.track-summary-action { display: flex; align-items: center; gap: .45rem; color: #e0c778; font-size: .58rem; font-weight: 900; white-space: nowrap; }
-.track-summary-action i { font-style: normal; }
-.track-summary-action b { font-size: 1rem; transition: transform .18s ease; }
-.track-close-label { display: none; }
-.map-track-drawer[open] .track-open-label { display: none; }
-.map-track-drawer[open] .track-close-label { display: inline; }
-.map-track-drawer[open] .track-summary-action b { transform: rotate(180deg); }
 .board-tracks {
   display: grid;
   grid-template-columns: repeat(3, minmax(7rem, .75fr)) repeat(3, minmax(8rem, 1fr));
@@ -596,16 +590,16 @@
 .realm-modal article > section p { margin: 0; color: #655f54; font-size: .69rem; line-height: 1.65; }
 
 @media (min-width: 821px) and (max-width: 1120px) {
-  .realm-main-grid { gap: .65rem; padding: .65rem; }
-  .realm-below-map { grid-template-columns: 1fr; }
+  .realm-main-grid { grid-template-columns: 1fr; gap: .65rem; padding: .65rem; }
+  .realm-below-map { display: grid; grid-template-columns: minmax(0, 1fr) minmax(22rem, 28rem); }
+  .realm-below-map .realm-players { grid-template-columns: repeat(3, minmax(0, 1fr)); }
   .realm-map { min-width: 0; }
   .map-toolbar { grid-template-columns: 1fr minmax(9rem, 13rem); }
   .map-tools { grid-column: 1 / -1; }
   .map-selection-dock { grid-template-columns: 1fr 1fr; }
   .map-adjacent { grid-column: 1 / -1; }
   .map-action-state { justify-self: end; grid-column: 2; grid-row: 1; }
-  .realm-command { display: grid; grid-template-columns: minmax(0, 1fr) minmax(18rem, .75fr); }
-  .realm-command .realm-error { grid-column: 1 / -1; }
+  .realm-command { display: flex; }
   .planning-progress header { align-items: flex-start; }
   .planning-progress header span { white-space: nowrap; }
   .order-grid { grid-template-columns: 1fr; }
@@ -619,7 +613,8 @@
   .realm-phase { grid-template-columns: 1fr auto; }
   .realm-phase p { grid-column: 1 / -1; grid-row: 2; }
   .realm-main-grid { min-width: 0; grid-template-columns: 1fr; padding: .55rem; }
-  .realm-below-map { grid-template-columns: 1fr; }
+  .realm-below-map { display: flex; }
+  .realm-below-map .realm-players { grid-template-columns: repeat(6, 9.5rem); overflow-x: auto; }
   .realm-map { min-width: 0; }
   .realm-map-viewport { height: min(68vh, 38rem); }
   .map-toolbar { grid-template-columns: minmax(8rem, 1fr) minmax(9rem, 1fr); }
@@ -650,7 +645,7 @@
   .map-adjacent { grid-column: 1 / -1; }
   .map-action-state { grid-column: 2; grid-row: 1; }
   .track-summary-copy small { white-space: normal; }
-  .track-summary-action i { display: none !important; }
+  .realm-track-overview > header > em { display: none; }
   .realm-map-shell.expanded { inset: 0; }
   .choice-grid, .order-grid { grid-template-columns: 1fr; }
   .raven-replace { grid-template-columns: 1fr; }
