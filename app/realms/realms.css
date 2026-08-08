@@ -221,10 +221,13 @@
   aspect-ratio: 2 / 3;
   flex: none;
   overflow: hidden;
-  background:
-    linear-gradient(rgba(8, 25, 29, .08), rgba(8, 25, 29, .2)),
-    url("/realms-board-v2.webp") center / cover no-repeat,
-    #173740;
+  background-color: #173740;
+  background-image:
+    linear-gradient(rgba(8, 25, 29, .015), rgba(8, 25, 29, .075)),
+    image-set(url("/realms-board-v3.webp") 1x, url("/realms-board-v3-hidpi.webp") 2x);
+  background-position: center;
+  background-size: cover;
+  background-repeat: no-repeat;
 }
 .realm-map-shell.expanded {
   position: fixed;
