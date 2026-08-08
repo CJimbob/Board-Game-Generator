@@ -256,6 +256,10 @@ function PlayerRibbon({ game, language, act }: { game: Game; language: Language;
 
 type MapPoint = [number, number];
 
+function rotateMapPoint([x, y]: MapPoint): MapPoint {
+  return [100 - y, x];
+}
+
 function clipCell(polygon: MapPoint[], seed: MapPoint, rival: MapPoint) {
   const a = 2 * (rival[0] - seed[0]);
   const b = 2 * (rival[1] - seed[1]);
@@ -315,7 +319,7 @@ function RealmMap({ game, language, inspectedKey, actionKey, onInspect, selectab
   const kindLabel = selectedDefinition?.kind === "sea" ? (language === "zh" ? "海域" : "Sea") : selectedDefinition?.kind === "port" ? (language === "zh" ? "港口" : "Port") : (language === "zh" ? "陆地" : "Land");
   const regions = useMemo(() => game.areaDefinitions.filter((definition) => definition.kind !== "port"), [game.areaDefinitions]);
   const ports = useMemo(() => game.areaDefinitions.filter((definition) => definition.kind === "port"), [game.areaDefinitions]);
-  const regionPolygons = useMemo(() => buildRegionPolygons(regions), [regions]);
+  const regionPolygons = useMemo(() => Object.fromEntries(Object.entries(buildRegionPolygons(regions)).map(([key, points]) => [key, points.map(rotateMapPoint)])) as Record<string, MapPoint[]>, [regions]);
   const navigableAreas = useMemo(() => game.areaDefinitions.filter((definition) => !game.areas[definition.key].blocked), [game.areaDefinitions, game.areas]);
   const actionRestricted = selectableAreaIds.length > 0;
   const selectedIsActionable = !actionRestricted || selectableAreaIds.includes(selectedDefinition?.key ?? "");
@@ -325,9 +329,10 @@ function RealmMap({ game, language, inspectedKey, actionKey, onInspect, selectab
     const viewport = viewportRef.current;
     const map = mapRef.current;
     if (!definition || !viewport || !map) return;
+    const [displayX, displayY] = rotateMapPoint([definition.x, definition.y]);
     viewport.scrollTo({
-      left: map.offsetLeft + map.offsetWidth * definition.x / 100 - viewport.clientWidth / 2,
-      top: map.offsetTop + map.offsetHeight * definition.y / 100 - viewport.clientHeight / 2,
+      left: map.offsetLeft + map.offsetWidth * displayX / 100 - viewport.clientWidth / 2,
+      top: map.offsetTop + map.offsetHeight * displayY / 100 - viewport.clientHeight / 2,
       behavior,
     });
   }, [game.areaDefinitions]);
@@ -402,8 +407,8 @@ function RealmMap({ game, language, inspectedKey, actionKey, onInspect, selectab
     const measure = () => {
       const usableWidth = Math.max(1, viewport.clientWidth - 16);
       const usableHeight = Math.max(1, viewport.clientHeight - 16);
-      const width = Math.min(usableWidth, usableHeight * 2 / 3);
-      setFitSize({ width, height: width * 3 / 2 });
+      const width = Math.min(usableWidth, usableHeight * 3 / 2);
+      setFitSize({ width, height: width * 2 / 3 });
     };
     measure();
     const observer = new ResizeObserver(measure);
@@ -428,7 +433,8 @@ function RealmMap({ game, language, inspectedKey, actionKey, onInspect, selectab
   const renderContents = (definition: AreaDefinition, inPort = false) => {
     const state = game.areas[definition.key];
     const units = state.units;
-    return <span className="area-content" style={{ left: `${definition.x}%`, top: `${definition.y}%` }} role={inPort ? undefined : "button"} tabIndex={inPort ? undefined : 0} onClick={inPort ? undefined : (event) => { event.stopPropagation(); chooseArea(definition.key); }} onKeyDown={inPort ? undefined : (event) => { if (event.key === "Enter" || event.key === " ") { event.preventDefault(); chooseArea(definition.key); } }}>
+    const [displayX, displayY] = rotateMapPoint([definition.x, definition.y]);
+    return <span className="area-content" style={{ left: `${displayX}%`, top: `${displayY}%` }} role={inPort ? undefined : "button"} tabIndex={inPort ? undefined : 0} onClick={inPort ? undefined : (event) => { event.stopPropagation(); chooseArea(definition.key); }} onKeyDown={inPort ? undefined : (event) => { if (event.key === "Enter" || event.key === " ") { event.preventDefault(); chooseArea(definition.key); } }}>
       <strong>{language === "zh" ? definition.name : definition.nameEn}</strong>
       <span className="area-icons">{definition.castle && <i>♜{definition.castle}</i>}{definition.supply && <i>▰{definition.supply}</i>}{definition.power && <i>◆{definition.power}</i>}{state.blocked && <i className="blocked">⊘</i>}{state.neutral && !state.blocked && <i className="neutral">⚔{state.neutral}</i>}{state.garrison && !state.neutral && <i className="garrison">▣{state.garrison}</i>}</span>
       {units.length > 0 && <span className="area-units">{units.map((unit) => <MapUnitPiece key={unit.id} unit={unit} color={factionMap.get(unit.faction)?.color} language={language} />)}</span>}
@@ -450,6 +456,7 @@ function RealmMap({ game, language, inspectedKey, actionKey, onInspect, selectab
     </header>
     <div ref={viewportRef} className={`realm-map-viewport ${dragging ? "dragging" : ""}`} onPointerDown={beginPan} onPointerMove={panMap} onPointerUp={endPan} onPointerCancel={endPan} onWheel={wheelZoom}>
       <div ref={mapRef} className="realm-map" style={fitSize.width ? { width: `${fitSize.width * zoom}px`, height: `${fitSize.height * zoom}px` } : undefined} aria-label={language === "zh" ? "六境战争版图" : "Map of the Six Realms"}>
+        <div className="realm-map-art" aria-hidden="true" />
         <div className="map-compass" aria-hidden="true">✦<small>N</small></div>
         <svg className="realm-region-overlay" viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true">{regions.map((definition) => {
       const state = game.areas[definition.key];
@@ -472,7 +479,8 @@ function RealmMap({ game, language, inspectedKey, actionKey, onInspect, selectab
       const state = game.areas[definition.key];
       const owner = state.units[0]?.faction ?? state.control;
       const faction = owner ? factionMap.get(owner) : null;
-      return <button key={definition.key} className={`realm-port ${state.blocked ? "blocked" : ""} ${selectableAreaIds.includes(definition.key) ? "selectable" : ""} ${actionKey === definition.key ? "action-selected" : ""} ${inspectedKey === definition.key ? "inspected" : ""}`} style={{ left: `${definition.x}%`, top: `${definition.y}%`, "--owner": faction?.color ?? "#806c4e" } as CSSProperties} onClick={() => chooseArea(definition.key)}>{renderContents(definition, true)}</button>;
+      const [displayX, displayY] = rotateMapPoint([definition.x, definition.y]);
+      return <button key={definition.key} className={`realm-port ${state.blocked ? "blocked" : ""} ${selectableAreaIds.includes(definition.key) ? "selectable" : ""} ${actionKey === definition.key ? "action-selected" : ""} ${inspectedKey === definition.key ? "inspected" : ""}`} style={{ left: `${displayX}%`, top: `${displayY}%`, "--owner": faction?.color ?? "#806c4e" } as CSSProperties} onClick={() => chooseArea(definition.key)}>{renderContents(definition, true)}</button>;
         })}
       </div>
     </div>

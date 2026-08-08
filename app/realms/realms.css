@@ -226,19 +226,26 @@
 .realm-map-viewport.dragging { cursor: grabbing; user-select: none; }
 .realm-map {
   position: relative;
-  width: min(100%, 32rem);
+  width: min(100%, 74rem);
   min-width: 0;
   margin: 0 auto;
-  aspect-ratio: 2 / 3;
+  aspect-ratio: 3 / 2;
   flex: none;
   overflow: hidden;
-  background-color: #173740;
-  background-image:
-    linear-gradient(rgba(245, 231, 193, .015), rgba(45, 34, 22, .025)),
-    image-set(url("/realms-board-v4-classic.webp") 1x, url("/realms-board-v4-classic-hidpi.webp") 2x);
-  background-position: center;
-  background-size: cover;
-  background-repeat: no-repeat;
+  background: #173740;
+}
+.realm-map-art {
+  position: absolute;
+  z-index: 0;
+  left: 50%;
+  top: 50%;
+  width: 66.6667%;
+  height: 150%;
+  background:
+    linear-gradient(rgba(245, 231, 193, .025), rgba(45, 34, 22, .04)),
+    image-set(url("/realms-board-v3.webp") 1x, url("/realms-board-v3-hidpi.webp") 2x) center / cover no-repeat;
+  transform: translate(-50%, -50%) rotate(90deg);
+  transform-origin: center;
 }
 .realm-map-shell.expanded {
   position: fixed;
@@ -270,8 +277,8 @@
   border: 1px solid rgba(221, 195, 136, .35);
   box-shadow: inset 0 0 0 4px rgba(5, 17, 21, .22), inset 0 0 45px rgba(2, 13, 17, .35);
 }
-.map-compass { position: absolute; z-index: 20; right: 19%; top: 2rem; color: rgba(235, 211, 151, .64); font: 3.8rem/1 Georgia, serif; text-shadow: 0 2px 10px #0d2830; }
-.map-compass small { position: absolute; left: 50%; top: -1rem; font-size: .58rem; transform: translateX(-50%); }
+.map-compass { position: absolute; z-index: 20; right: 2.3rem; top: 2rem; color: rgba(235, 211, 151, .64); font: 3.8rem/1 Georgia, serif; text-shadow: 0 2px 10px #0d2830; }
+.map-compass small { position: absolute; left: calc(100% + .35rem); top: 50%; font-size: .58rem; transform: translateY(-50%); }
 .realm-region-overlay { position: absolute; z-index: 2; inset: 0; width: 100%; height: 100%; pointer-events: none; }
 .realm-region-overlay polygon { fill: var(--region-owner); fill-opacity: .035; stroke: rgba(255, 247, 220, .94); stroke-width: 1.15; stroke-linejoin: round; vector-effect: non-scaling-stroke; filter: drop-shadow(0 1px 0 rgba(50, 39, 26, .72)); transition: fill-opacity .15s ease, stroke-width .15s ease; }
 .realm-region-overlay polygon.sea { fill-opacity: .018; stroke: rgba(222, 235, 224, .78); stroke-width: .9; stroke-dasharray: 4 2; }
