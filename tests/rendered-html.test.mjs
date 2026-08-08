@@ -56,6 +56,9 @@ test("ships the complete online realm-war surface and bilingual rulebook", async
   assert.match(client, /完整规则/);
   assert.match(client, /The Six Realms/);
   assert.match(client, /战争纪事/);
+  assert.match(client, /realm-below-map/);
+  assert.match(client, /战局总览/);
+  assert.match(client, /open=\{tracksOpen\}/);
   assert.match(client, /退出战局/);
   assert.match(client, /LAST_RECOVERY_KEY/);
   assert.match(client, /saved\?\.code === invitedRoom/);
