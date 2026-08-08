@@ -182,11 +182,12 @@
 .realm-players em { position: absolute; right: .45rem; bottom: .2rem; color: #846a30; font-size: .5rem; font-style: normal; }
 .realm-entrust { position: absolute; right: .35rem; bottom: .18rem; border: 1px solid #9f7f44; border-radius: 2px; padding: .18rem .3rem; color: #7c2d2b; background: #fff1d5; font-size: .48rem; font-weight: 800; }
 
-.realm-track-overview { color: #d9cba9; background: linear-gradient(110deg, #10272c, #0d2025); border-bottom: 1px solid rgba(222, 197, 139, .34); }
+.realm-board-column { min-width: 0; display: flex; flex-direction: column; gap: .8rem; }
+.realm-track-overview { min-width: 0; color: #d9cba9; background: linear-gradient(110deg, #10272c, #0d2025); border: 1px solid rgba(222, 197, 139, .34); }
 .realm-track-overview > header { min-height: 3.35rem; display: grid; grid-template-columns: auto minmax(0, 1fr) auto; gap: .7rem; align-items: center; padding: .65rem .85rem 0; color: #e6cf8f; }
 .realm-track-overview > header > em { color: #e0c778; font-size: .54rem; font-style: normal; font-weight: 900; letter-spacing: .08em; text-transform: uppercase; }
 .realm-main-grid { display: grid; grid-template-columns: minmax(0, 1fr) minmax(24rem, 30rem); gap: 1rem; align-items: start; padding: 1rem; }
-.realm-below-map { min-width: 0; display: flex; flex-direction: column; gap: .8rem; align-items: stretch; }
+.realm-below-map { position: sticky; top: 1rem; min-width: 0; max-height: calc(100vh - 2rem); display: flex; flex-direction: column; gap: .8rem; align-items: stretch; overflow-y: auto; padding-right: .25rem; scrollbar-color: #9c824b #c1b59d; scrollbar-width: thin; }
 .realm-status-stack { min-width: 0; display: grid; gap: .8rem; }
 .realm-below-map .realm-phase { border: 1px solid rgba(255, 255, 255, .08); }
 .realm-below-map .realm-phase { grid-template-columns: minmax(0, 1fr) auto; gap: .5rem; padding: .75rem; }
@@ -591,7 +592,7 @@
 
 @media (min-width: 821px) and (max-width: 1120px) {
   .realm-main-grid { grid-template-columns: 1fr; gap: .65rem; padding: .65rem; }
-  .realm-below-map { display: grid; grid-template-columns: minmax(0, 1fr) minmax(22rem, 28rem); }
+  .realm-below-map { position: static; max-height: none; display: grid; grid-template-columns: minmax(0, 1fr) minmax(22rem, 28rem); overflow: visible; padding-right: 0; }
   .realm-below-map .realm-players { grid-template-columns: repeat(3, minmax(0, 1fr)); }
   .realm-map { min-width: 0; }
   .map-toolbar { grid-template-columns: 1fr minmax(9rem, 13rem); }
@@ -613,7 +614,7 @@
   .realm-phase { grid-template-columns: 1fr auto; }
   .realm-phase p { grid-column: 1 / -1; grid-row: 2; }
   .realm-main-grid { min-width: 0; grid-template-columns: 1fr; padding: .55rem; }
-  .realm-below-map { display: flex; }
+  .realm-below-map { position: static; max-height: none; display: flex; overflow: visible; padding-right: 0; }
   .realm-below-map .realm-players { grid-template-columns: repeat(6, 9.5rem); overflow-x: auto; }
   .realm-map { min-width: 0; }
   .realm-map-viewport { height: min(68vh, 38rem); }

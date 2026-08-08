@@ -59,6 +59,7 @@ test("ships the complete online realm-war surface and bilingual rulebook", async
   assert.match(client, /realm-below-map/);
   assert.match(client, /战局总览/);
   assert.match(client, /realm-track-overview/);
+  assert.match(client, /realm-board-column/);
   assert.doesNotMatch(client, /tracksOpen/);
   assert.match(client, /rotateMapPoint/);
   assert.match(client, /退出战局/);
@@ -68,6 +69,7 @@ test("ships the complete online realm-war surface and bilingual rulebook", async
   assert.match(styles, /\.realm-map/);
   assert.match(styles, /aspect-ratio:\s*3 \/ 2/);
   assert.match(styles, /grid-template-columns:\s*minmax\(0, 1fr\) minmax\(24rem, 30rem\)/);
+  assert.match(styles, /max-height:\s*calc\(100vh - 2rem\)/);
   assert.match(styles, /realms-board-v3-hidpi/);
   assert.match(styles, /@media/);
   assert.match(route, /loadRoomRecord<RealmState>/);
