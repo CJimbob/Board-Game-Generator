@@ -251,6 +251,11 @@ const AREA_TERRAIN: Record<string, string> = {
   red_desert: "desert", red_steppe: "desert", salt_marsh: "marsh", sunfield: "field",
 };
 
+function MapUnitPiece({ unit, color, language }: { unit: Unit; color?: string; language: Language }) {
+  const label = UNIT_LABELS[unit.type][language === "zh" ? 1 : 2];
+  return <span className={`map-unit-piece ${unit.type} ${unit.routed ? "routed" : ""}`} style={{ "--unit-color": color ?? "#667" } as CSSProperties} title={label} aria-label={label}><i className="unit-shape" aria-hidden="true" /></span>;
+}
+
 function RealmMap({ game, language, selectedKey, onSelect, selectableAreaIds }: { game: Game; language: Language; selectedKey: string; onSelect: (areaId: string) => void; selectableAreaIds: string[] }) {
   const factionMap = new Map(game.factions.map((faction) => [faction.key, faction]));
   const chooseArea = (areaId: string) => { if (!selectableAreaIds.length || selectableAreaIds.includes(areaId)) onSelect(areaId); };
@@ -267,7 +272,7 @@ function RealmMap({ game, language, selectedKey, onSelect, selectableAreaIds }: 
     return <span className="area-content" style={{ left: `${definition.x}%`, top: `${definition.y}%` }} role={inPort || !selectable ? undefined : "button"} tabIndex={inPort || !selectable ? undefined : 0} onClick={inPort || !selectable ? undefined : (event) => { event.stopPropagation(); chooseArea(definition.key); }} onKeyDown={inPort || !selectable ? undefined : (event) => { if (event.key === "Enter" || event.key === " ") { event.preventDefault(); chooseArea(definition.key); } }}>
       <strong>{language === "zh" ? definition.name : definition.nameEn}</strong>
       <span className="area-icons">{definition.castle && <i>♜{definition.castle}</i>}{definition.supply && <i>▰{definition.supply}</i>}{definition.power && <i>◆{definition.power}</i>}{state.neutral && <i className="neutral">⚔{state.neutral >= 99 ? "∞" : state.neutral}</i>}{state.garrison && <i className="garrison">▣{state.garrison}</i>}</span>
-      {units.length > 0 && <span className="area-units">{units.map((unit) => <i key={unit.id} className={unit.routed ? "routed" : ""} style={{ background: factionMap.get(unit.faction)?.color }}>{UNIT_LABELS[unit.type][0]}</i>)}</span>}
+      {units.length > 0 && <span className="area-units">{units.map((unit) => <MapUnitPiece key={unit.id} unit={unit} color={factionMap.get(unit.faction)?.color} language={language} />)}</span>}
       {state.order && <i className={`map-order ${state.order === "hidden" ? "hidden" : ""}`}>{state.order === "hidden" ? "?" : ORDER_LABELS[state.order as Order][language === "zh" ? 0 : 1]}</i>}
     </span>;
   };
@@ -296,6 +301,7 @@ function RealmMap({ game, language, selectedKey, onSelect, selectableAreaIds }: 
     {selectedDefinition && selectedState && <aside className="map-inspector" style={{ "--owner": selectedOwner?.color ?? "#9a8d70" } as CSSProperties}>
       <span>{kindLabel} · {selectedOwner ? (language === "zh" ? selectedOwner.name : selectedOwner.nameEn) : (language === "zh" ? "未控制" : "Uncontrolled")}</span>
       <strong>{language === "zh" ? selectedDefinition.name : selectedDefinition.nameEn}</strong>
+      {selectedState.units.length > 0 && <div className="map-inspector-units">{selectedState.units.map((unit) => <MapUnitPiece key={unit.id} unit={unit} color={factionMap.get(unit.faction)?.color} language={language} />)}</div>}
       <small>{language === "zh" ? "相邻" : "Adjacent"}: {selectedDefinition.adjacent.map((id) => areaName(game, id, language)).join(" · ")}</small>
     </aside>}
   </div>;

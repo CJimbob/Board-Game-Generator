@@ -188,7 +188,7 @@
   overflow: hidden;
   background:
     linear-gradient(rgba(8, 25, 29, .08), rgba(8, 25, 29, .2)),
-    url("/realms-map.webp") center / cover no-repeat,
+    url("/realms-map-hd.webp") center / cover no-repeat,
     #173740;
 }
 .realm-map::before {
@@ -311,9 +311,31 @@
 .area-icons i { font-style: normal; }
 .area-icons .neutral { color: #9b2429; font-weight: 900; }
 .area-icons .garrison { color: #4a3722; font-weight: 900; }
-.area-units { display: flex; gap: .12rem; flex-wrap: wrap; }
-.area-units i { width: 1rem; height: 1rem; display: grid; place-items: center; color: white; border: 1px solid rgba(255, 255, 255, .62); border-radius: 50%; box-shadow: 0 2px 4px rgba(9, 18, 18, .35); font-size: .48rem; font-style: normal; font-weight: 900; text-shadow: 0 1px 2px #000; }
-.area-units i.routed { filter: grayscale(.8); transform: rotate(90deg); opacity: .58; }
+.area-units { display: flex; gap: .18rem; flex-wrap: wrap; margin-top: .12rem; }
+.map-unit-piece {
+  --unit-color: #667;
+  position: relative;
+  width: 1.55rem;
+  height: 1.55rem;
+  flex: 0 0 1.55rem;
+  display: block;
+  color: #fff8e7;
+  background: linear-gradient(145deg, color-mix(in srgb, var(--unit-color) 82%, white), color-mix(in srgb, var(--unit-color) 76%, #111));
+  border: 1px solid color-mix(in srgb, var(--unit-color) 48%, white);
+  border-radius: .28rem;
+  box-shadow: 0 3px 7px rgba(5, 15, 16, .5), inset 0 0 0 1px rgba(255,255,255,.12);
+  filter: drop-shadow(0 1px 0 rgba(0,0,0,.25));
+}
+.map-unit-piece .unit-shape { position: absolute; inset: .18rem; display: block; color: #fff7e7; font-style: normal; filter: drop-shadow(0 1px 1px rgba(0,0,0,.65)); }
+.map-unit-piece.footman .unit-shape::before { content: ""; position: absolute; width: .34rem; height: .34rem; left: 50%; top: .05rem; transform: translateX(-50%); background: currentColor; border-radius: 50%; }
+.map-unit-piece.footman .unit-shape::after { content: ""; position: absolute; width: .76rem; height: .72rem; left: 50%; bottom: .02rem; transform: translateX(-50%); background: currentColor; clip-path: polygon(36% 0, 64% 0, 70% 23%, 100% 43%, 86% 58%, 69% 49%, 77% 100%, 23% 100%, 31% 49%, 14% 58%, 0 43%, 30% 23%); }
+.map-unit-piece.knight .unit-shape::before { content: "♞"; position: absolute; inset: -.3rem; display: grid; place-items: center; font: 900 1.45rem/1 Georgia, serif; }
+.map-unit-piece.ship .unit-shape::before { content: ""; position: absolute; left: .48rem; top: .02rem; width: .08rem; height: .78rem; background: currentColor; box-shadow: -.29rem .57rem 0 -.02rem currentColor; transform: rotate(-2deg); }
+.map-unit-piece.ship .unit-shape::after { content: ""; position: absolute; inset: .12rem .02rem .05rem; background: currentColor; clip-path: polygon(47% 0, 47% 48%, 8% 48%, 0 64%, 15% 93%, 82% 93%, 100% 61%, 57% 61%, 57% 14%, 94% 45%, 57% 45%); }
+.map-unit-piece.siege .unit-shape { background: radial-gradient(circle at 24% 82%, currentColor 0 12%, transparent 14%), radial-gradient(circle at 76% 82%, currentColor 0 12%, transparent 14%); }
+.map-unit-piece.siege .unit-shape::before { content: ""; position: absolute; left: .14rem; right: .14rem; bottom: .25rem; height: .36rem; background: currentColor; clip-path: polygon(10% 0, 88% 0, 100% 100%, 0 100%); }
+.map-unit-piece.siege .unit-shape::after { content: ""; position: absolute; width: .16rem; height: .88rem; left: .48rem; top: -.03rem; background: currentColor; border-radius: .08rem; transform: rotate(47deg); transform-origin: bottom center; box-shadow: 0 -.08rem 0 .07rem currentColor; }
+.map-unit-piece.routed { transform: rotate(90deg); filter: grayscale(.8) drop-shadow(0 1px 0 rgba(0,0,0,.25)); opacity: .58; }
 .map-order { position: absolute; left: calc(100% - .25rem); top: calc(100% - .2rem); max-width: 4.8rem; padding: .18rem .3rem; color: #f7eed7; background: #222b29; border: 1px solid #d5bd7d; border-radius: 50%; box-shadow: 0 2px 6px rgba(5, 13, 13, .38); font-size: .42rem; font-style: normal; font-weight: 800; text-align: center; text-shadow: none; }
 .map-order.hidden { width: 1.4rem; height: 1.4rem; display: grid; place-items: center; color: #e7cb84; font-size: .72rem; }
 .realm-port {
@@ -336,7 +358,7 @@
 .realm-port .area-content { width: 5rem; left: 50% !important; top: calc(100% + 1.05rem) !important; transform: translate(-50%, 0) rotate(-45deg); align-items: center; color: #f0e5c9; text-shadow: 0 1px 2px #091c21; }
 .realm-port .area-content strong { width: 5rem; text-align: center; font-size: .46rem; }
 .realm-port .area-icons { display: none; }
-.realm-port .area-units { position: absolute; bottom: 1.8rem; left: 1.45rem; min-width: 4rem; }
+.realm-port .area-units { position: absolute; bottom: 1.8rem; left: 1.45rem; min-width: 5rem; }
 .realm-port .map-order { left: 1.3rem; top: 1.3rem; }
 .map-inspector {
   --owner: #9a8d70;
@@ -356,6 +378,8 @@
 }
 .map-inspector span { color: #cbb984; font-size: .45rem; font-weight: 900; letter-spacing: .08em; text-transform: uppercase; }
 .map-inspector strong { font: 900 .95rem "Songti SC", STSong, Georgia, serif; }
+.map-inspector-units { display: flex; gap: .25rem; margin: .22rem 0 .3rem; }
+.map-inspector-units .map-unit-piece { width: 1.8rem; height: 1.8rem; flex-basis: 1.8rem; }
 .map-inspector small { color: #b9c5c0; font-size: .5rem; line-height: 1.5; }
 
 .realm-command { display: flex; flex-direction: column; gap: .8rem; }
