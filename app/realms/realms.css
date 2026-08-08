@@ -599,10 +599,10 @@
   .realm-track-overview .board-tracks .number-track { grid-template-columns: repeat(auto-fit, minmax(1.15rem, 1fr)); }
   .realm-track-overview .board-influence ol { grid-template-columns: repeat(6, minmax(1.35rem, 1fr)); }
   .realm-track-overview .board-influence li { justify-content: center; padding: 0 .2rem; }
-  .realm-map-wrap { min-height: 0; height: 100%; }
+  .realm-map-wrap { min-height: 0; height: auto; }
   .realm-map-shell { height: 100%; display: grid; grid-template-rows: auto minmax(0, 1fr) auto; overflow: hidden; }
   .realm-map-viewport { height: auto; min-height: 0; }
-  .realm-below-map { position: static; top: auto; height: 100%; max-height: none; }
+  .realm-below-map { position: static; top: auto; min-height: 0; height: 100%; max-height: none; scrollbar-gutter: stable; }
 }
 
 @media (min-width: 821px) and (max-width: 1120px) {

@@ -72,6 +72,7 @@ test("ships the complete online realm-war surface and bilingual rulebook", async
   assert.match(styles, /max-height:\s*calc\(100vh - 2rem\)/);
   assert.match(styles, /grid-template-rows:\s*auto minmax\(0, 1fr\)/);
   assert.match(styles, /repeat\(auto-fit, minmax\(1\.15rem, 1fr\)\)/);
+  assert.match(styles, /\.realm-map-wrap \{ min-height: 0; height: auto; \}/);
   assert.match(styles, /realms-board-v3-hidpi/);
   assert.match(styles, /@media/);
   assert.match(route, /loadRoomRecord<RealmState>/);
