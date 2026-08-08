@@ -186,7 +186,7 @@
 .realm-track-overview { min-width: 0; color: #d9cba9; background: linear-gradient(110deg, #10272c, #0d2025); border: 1px solid rgba(222, 197, 139, .34); }
 .realm-track-overview > header { min-height: 3.35rem; display: grid; grid-template-columns: auto minmax(0, 1fr) auto; gap: .7rem; align-items: center; padding: .65rem .85rem 0; color: #e6cf8f; }
 .realm-track-overview > header > em { color: #e0c778; font-size: .54rem; font-style: normal; font-weight: 900; letter-spacing: .08em; text-transform: uppercase; }
-.realm-main-grid { display: grid; grid-template-columns: minmax(0, 1fr) minmax(24rem, 30rem); gap: 1rem; align-items: start; padding: 1rem; }
+.realm-main-grid { display: grid; grid-template-columns: minmax(0, 1fr) minmax(19rem, 27rem); gap: 1rem; align-items: start; padding: 1rem; }
 .realm-below-map { position: sticky; top: 1rem; min-width: 0; max-height: calc(100vh - 2rem); display: flex; flex-direction: column; gap: .8rem; align-items: stretch; overflow-y: auto; padding-right: .25rem; scrollbar-color: #9c824b #c1b59d; scrollbar-width: thin; }
 .realm-status-stack { min-width: 0; display: grid; gap: .8rem; }
 .realm-below-map .realm-phase { border: 1px solid rgba(255, 255, 255, .08); }
@@ -590,22 +590,22 @@
 .realm-modal article > section h3 { margin: 0 0 .3rem; font: 900 .9rem "Songti SC", STSong, Georgia, serif; }
 .realm-modal article > section p { margin: 0; color: #655f54; font-size: .69rem; line-height: 1.65; }
 
-@media (min-width: 1121px) {
+@media (min-width: 900px) {
   .realm-table { height: 100vh; display: grid; grid-template-rows: auto minmax(0, 1fr); overflow: hidden; padding-bottom: 0; }
   .realm-main-grid { min-height: 0; height: 100%; }
-  .realm-board-column { min-height: 0; display: grid; grid-template-rows: auto minmax(0, 1fr); overflow: hidden; }
+  .realm-board-column { min-height: 0; height: 100%; display: flex; overflow-y: auto; padding-right: .15rem; scrollbar-color: #9c824b #c1b59d; scrollbar-width: thin; }
   .realm-track-overview > header { min-height: 2.7rem; padding: .4rem .65rem 0; }
-  .realm-track-overview .board-tracks { gap: .4rem; padding: .5rem .65rem; overflow: hidden; }
+  .realm-track-overview .board-tracks { grid-template-columns: repeat(6, minmax(0, 1fr)); gap: .4rem; padding: .5rem .65rem; overflow: hidden; }
   .realm-track-overview .board-tracks .number-track { grid-template-columns: repeat(auto-fit, minmax(1.15rem, 1fr)); }
   .realm-track-overview .board-influence ol { grid-template-columns: repeat(6, minmax(1.35rem, 1fr)); }
   .realm-track-overview .board-influence li { justify-content: center; padding: 0 .2rem; }
-  .realm-map-wrap { min-height: 0; height: auto; }
-  .realm-map-shell { height: 100%; display: grid; grid-template-rows: auto minmax(0, 1fr) auto; overflow: hidden; }
+  .realm-map-wrap { min-height: 0; height: auto; flex: 0 0 auto; }
+  .realm-map-shell { height: auto; display: block; overflow: hidden; }
   .realm-map-viewport { height: auto; min-height: 0; }
   .realm-below-map { position: static; top: auto; min-height: 0; height: 100%; max-height: none; scrollbar-gutter: stable; }
 }
 
-@media (min-width: 821px) and (max-width: 1120px) {
+@media (min-width: 821px) and (max-width: 899px) {
   .realm-main-grid { grid-template-columns: 1fr; gap: .65rem; padding: .65rem; }
   .realm-below-map { position: static; max-height: none; display: grid; grid-template-columns: minmax(0, 1fr) minmax(22rem, 28rem); overflow: visible; padding-right: 0; }
   .realm-below-map .realm-players { grid-template-columns: repeat(3, minmax(0, 1fr)); }
