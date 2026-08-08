@@ -569,6 +569,33 @@ function ownUnitAreas(game: Game, faction: string | null) { return game.areaDefi
 function areaName(game: Game, id: string, language: Language) { const area = game.areaDefinitions.find((item) => item.key === id); return area ? language === "zh" ? area.name : area.nameEn : id; }
 function factionName(game: Game, id: string, language: Language) { const faction = game.factions.find((item) => item.key === id); return faction ? language === "zh" ? faction.name : faction.nameEn : id; }
 
+function areaOwner(game: Game, areaId: string): string | null {
+  const state = game.areas[areaId];
+  if (!state || state.blocked) return null;
+  const unitFaction = state.units[0]?.faction;
+  if (unitFaction) return unitFaction;
+  const definition = game.areaDefinitions.find((area) => area.key === areaId);
+  if (definition?.kind === "port" && definition.portOf) return areaOwner(game, definition.portOf);
+  return state.control;
+}
+
+function orderFamily(order: Order) {
+  if (order.startsWith("raid")) return "raid";
+  if (order.startsWith("march")) return "march";
+  if (order.startsWith("defend")) return "defend";
+  if (order.startsWith("support")) return "support";
+  return "power";
+}
+
+function legalRaidTarget(source: AreaDefinition, target: AreaDefinition, sourceOrder: Order, targetOrder: Order) {
+  if (!source.adjacent.includes(target.key)) return false;
+  if (source.kind === "land" && target.kind !== "land") return false;
+  if (source.kind === "port" && target.kind !== "sea") return false;
+  const family = orderFamily(targetOrder);
+  if (["raid", "support", "power"].includes(family)) return true;
+  return sourceOrder === "raid_star" && family === "defend";
+}
+
 function PlanningPanel({ game, me, language, act, selectedAreaId, onSelectArea }: { game: Game; me: Player; language: Language; act: (action: string, payload?: Record<string, unknown>) => void; selectedAreaId: string; onSelectArea: (areaId: string) => void }) {
   const text = (zh: string, en: string) => language === "zh" ? zh : en;
   const areas = ownUnitAreas(game, me.faction);
@@ -610,10 +637,19 @@ function TieBreakPanel({ game, language, act }: { game: Game; language: Language
 
 function RaidPanel({ game, me, language, act }: { game: Game; me: Player; language: Language; act: (action: string, payload?: Record<string, unknown>) => void }) {
   const text = (zh: string, en: string) => language === "zh" ? zh : en;
-  const sources = game.areaDefinitions.filter((area) => game.areas[area.key].order?.startsWith("raid") && game.areas[area.key].units.some((unit) => unit.faction === me.faction));
-  const [source, setSource] = useState(sources[0]?.key ?? "");
-  const targets = game.areaDefinitions.filter((area) => game.areaDefinitions.find((item) => item.key === source)?.adjacent.includes(area.key) && game.areas[area.key].order && game.areas[area.key].control !== me.faction);
-  return <section className="action-card"><h3>{text("结算一枚突袭命令", "Resolve one Raid order")}</h3><select value={source} onChange={(event) => setSource(event.target.value)}>{sources.map((area) => <option key={area.key} value={area.key}>{areaName(game, area.key, language)}</option>)}</select><div className="choice-grid">{targets.map((area) => <button key={area.key} onClick={() => act("raid", { sourceAreaId: source, targetAreaId: area.key })}>{text("取消", "Cancel")} {areaName(game, area.key, language)} · {String(game.areas[area.key].order)}</button>)}</div><button onClick={() => act("raid", { sourceAreaId: source })}>{text("放弃这次突袭", "Skip this raid")}</button></section>;
+  const sources = game.areaDefinitions.filter((area) => {
+    const order = game.areas[area.key].order;
+    return areaOwner(game, area.key) === me.faction && order && order !== "hidden" && orderFamily(order) === "raid";
+  });
+  const [selectedSource, setSelectedSource] = useState("");
+  const source = sources.some((area) => area.key === selectedSource) ? selectedSource : sources[0]?.key ?? "";
+  const sourceDefinition = game.areaDefinitions.find((area) => area.key === source);
+  const sourceOrder = game.areas[source]?.order;
+  const targets = sourceDefinition && sourceOrder && sourceOrder !== "hidden" ? game.areaDefinitions.filter((area) => {
+    const targetOrder = game.areas[area.key].order;
+    return targetOrder && targetOrder !== "hidden" && areaOwner(game, area.key) !== me.faction && legalRaidTarget(sourceDefinition, area, sourceOrder, targetOrder);
+  }) : [];
+  return <section className="action-card"><h3>{text("结算一枚突袭命令", "Resolve one Raid order")}</h3><select value={source} disabled={!source} onChange={(event) => setSelectedSource(event.target.value)}>{sources.map((area) => <option key={area.key} value={area.key}>{areaName(game, area.key, language)} · {ORDER_LABELS[game.areas[area.key].order as Order][language === "zh" ? 0 : 1]}</option>)}</select>{targets.length > 0 ? <div className="choice-grid">{targets.map((area) => { const targetOrder = game.areas[area.key].order as Order; return <button key={area.key} onClick={() => act("raid", { sourceAreaId: source, targetAreaId: area.key })}>{text("取消", "Cancel")} {areaName(game, area.key, language)} · {ORDER_LABELS[targetOrder][language === "zh" ? 0 : 1]}</button>; })}</div> : <p>{text("这枚突袭没有合法目标，可以直接放弃并继续。", "This Raid has no legal target. Skip it to continue.")}</p>}<button disabled={!source} onClick={() => act("raid", { sourceAreaId: source })}>{text("放弃这次突袭", "Skip this raid")}</button></section>;
 }
 
 function MarchPanel({ game, me, language, act }: { game: Game; me: Player; language: Language; act: (action: string, payload?: Record<string, unknown>) => void }) {
