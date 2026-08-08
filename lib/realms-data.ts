@@ -47,7 +47,8 @@ export type RealmLeaderEffect =
   | "upgrade_after_win" | "discard_enemy_card" | "cancel_ship_support"
   | "enemy_card_zero" | "ship_attack" | "home_defense" | "solo_icons"
   | "destroy_footman" | "march_again" | "remove_defense" | "no_attacker_advance"
-  | "move_influence_bottom" | "reselect_card";
+  | "move_influence_bottom" | "reselect_card" | "throne_rival" | "discard_synergy"
+  | "castle_defense" | "stance_icon" | "remove_adjacent_order";
 
 export type RealmLeaderCard = {
   key: string;
@@ -129,7 +130,7 @@ const card = (
 export const REALM_LEADERS: RealmLeaderCard[] = [
   card("frost", "frost_4", "寒峰统帅", "High Warden", 4, 2),
   card("frost", "frost_3", "雪原继承人", "Heir of Snow", 3, 0, 0, "retreat_choice", "若你获胜，可决定败军撤退区域。", "If you win, you may choose the defeated army's retreat area."),
-  card("frost", "frost_2a", "灰堡伯爵", "Grey Castellan", 2, 0, 0, "recover_cards", "战斗后收回弃牌堆中的全部领袖牌。", "After combat, return all discarded leader cards to your hand."),
+  card("frost", "frost_2a", "灰堡伯爵", "Grey Castellan", 2, 0, 0, "recover_cards", "若你战败，收回弃牌堆中的全部领袖牌（包括本牌）。", "If you lose, return every discarded leader card, including this card, to your hand."),
   card("frost", "frost_2b", "荒原巨剑", "Greatsword of the Waste", 2, 1),
   card("frost", "frost_1a", "白塔骑士", "Knight of the White Tower", 1, 0, 2),
   card("frost", "frost_1b", "河湾游侠", "River Ranger", 1, 0, 0, "no_casualties", "你在本场战斗中不承受领袖牌造成的伤亡。", "You suffer no casualties from leader-card sword icons in this combat."),
@@ -143,13 +144,13 @@ export const REALM_LEADERS: RealmLeaderCard[] = [
   card("umbral", "umbral_1b", "城门守备", "Gate Castellan", 1, 0, 0, "footman_attack", "你进攻时，参战与支援的步兵各提供 2 战力。", "When attacking, each participating and supporting Footman contributes 2 strength."),
   card("umbral", "umbral_0", "长夜密探", "Agent of the Long Night", 0, 0, 0, "remove_order", "若获胜，移除对手一个仍在版图上的命令。", "If you win, remove one unresolved opposing order."),
 
-  card("sunward", "sunward_4", "曜日摄政", "Sun Regent", 4),
-  card("sunward", "sunward_3", "金狮战侯", "Golden War-Lord", 3, 1),
-  card("sunward", "sunward_2a", "海门提督", "Admiral of the Gate", 2, 0, 0, "cancel_ship_support", "取消对手所有舰船支援战力。", "Cancel all opposing Ship support strength."),
+  card("sunward", "sunward_4", "曜日摄政", "Sun Regent", 4, 0, 0, "throne_rival", "若对手在王座轨道高于你，本牌战力 +1。", "If your opponent is higher on the Throne track, this card gains +1 strength."),
+  card("sunward", "sunward_3", "金狮战侯", "Golden War-Lord", 3, 0, 0, "upgrade_after_win", "若获胜，可将一名参战或本家支援步兵升级为骑兵。", "If you win, upgrade one participating or friendly supporting Footman to a Knight."),
+  card("sunward", "sunward_2a", "海门提督", "Admiral of the Gate", 2, 0, 0, "discard_synergy", "若曜日摄政在弃牌堆，本牌战力 +1 并获得 1 剑。", "If Sun Regent is discarded, this card gains +1 strength and 1 sword."),
   card("sunward", "sunward_2b", "誓剑女爵", "Oathblade Lady", 2, 1, 1),
   card("sunward", "sunward_1a", "炉火先知", "Oracle of Embers", 1, 1),
-  card("sunward", "sunward_1b", "港湾走私王", "Smuggler King", 1, 0, 0, "win_power", "若获胜，获得 1 威望。", "If you win, gain 1 power."),
-  card("sunward", "sunward_0", "无面弄臣", "Faceless Fool", 0, 0, 0, "discard_enemy_card", "战斗后随机弃掉对手手中的一张领袖牌。", "After combat, discard one random leader card from the opponent's hand."),
+  card("sunward", "sunward_1b", "港湾走私王", "Smuggler King", 1, 0, 0, "cancel_ship_support", "本场战斗中所有非本家舰船的战力视为 0。", "All non-Sunward Ships contribute 0 strength in this combat."),
+  card("sunward", "sunward_0", "无面弄臣", "Faceless Fool", 0, 0, 0, "discard_enemy_card", "战斗后查看并弃掉对手手中的一张领袖牌。", "After combat, discard one leader card from the opponent's hand."),
 
   card("verdant", "verdant_4", "荆棘元帅", "Thorn Marshal", 4, 0, 0, "destroy_footman", "战斗开始时，摧毁敌军一名步兵。", "At combat start, destroy one opposing Footman."),
   card("verdant", "verdant_3", "百花骑士", "Knight of a Hundred Blooms", 3, 0, 0, "march_again", "作为进攻方获胜后，该行军命令可保留并再次结算。", "If you win as attacker, the March order may remain and be resolved again."),
@@ -157,20 +158,20 @@ export const REALM_LEADERS: RealmLeaderCard[] = [
   card("verdant", "verdant_2b", "古橡将军", "Old Oak General", 2, 1),
   card("verdant", "verdant_1a", "谷地守望", "Vale Sentinel", 1, 0, 2),
   card("verdant", "verdant_1b", "花冠继承人", "Heir of Flowers", 1, 0, 1),
-  card("verdant", "verdant_0", "蔷薇太后", "Rose Dowager", 0, 0, 0, "remove_defense", "移除战斗区域中的防御命令。", "Remove the Defense order from the embattled area."),
+  card("verdant", "verdant_0", "蔷薇太后", "Rose Dowager", 0, 0, 0, "remove_adjacent_order", "立即移除战斗区域相邻的一枚敌方命令，但不能移除发起战斗的行军。", "Immediately remove an opposing order adjacent to the battle, except the initiating March."),
 
   card("redmarch", "redmarch_4", "赤沙亲王", "Prince of Red Sands", 4, 2, 1),
   card("redmarch", "redmarch_3", "高塔卫长", "High Tower Captain", 3, 0, 1),
   card("redmarch", "redmarch_2a", "暮星剑客", "Duskstar", 2, 1),
   card("redmarch", "redmarch_2b", "烈矛女将", "Spear-Maiden", 2, 1),
-  card("redmarch", "redmarch_1a", "沙海统领", "Commander of Sands", 1, 1, 1),
+  card("redmarch", "redmarch_1a", "沙海统领", "Commander of Sands", 1, 0, 0, "stance_icon", "进攻时获得 1 剑；防守时获得 1 城堡。", "Gain 1 sword when attacking or 1 fortification when defending."),
   card("redmarch", "redmarch_1b", "赤岭公主", "Princess of the March", 1, 0, 0, "no_attacker_advance", "你作为防守方败北时，进攻军不能进入该区域。", "If you lose as defender, the attacking army cannot advance into the area."),
   card("redmarch", "redmarch_0", "长枪谋主", "Spear Strategist", 0, 0, 0, "move_influence_bottom", "战斗后将对手在一个影响力轨道移到末位。", "After combat, move the opponent to the bottom of one influence track."),
 
   card("tide", "tide_4", "风暴海王", "Storm King", 4, 1),
   card("tide", "tide_3", "破浪船主", "Wavebreaker", 3, 0, 0, "ship_attack", "进攻时，参战与支援的舰船各额外提供 1 战力。", "When attacking, participating and supporting Ships gain +1 strength each."),
   card("tide", "tide_2a", "盐冠领主", "Lord of the Salt Crown", 2, 0, 0, "enemy_card_zero", "对手领袖牌的印刷战力视为 0。", "The printed strength of the opposing leader card is treated as 0."),
-  card("tide", "tide_2b", "海崖守将", "Cliff Warden", 2, 1, 0, "home_defense", "在本家主城防守时额外获得 1 城堡图标。", "When defending your home area, gain 1 additional fortification."),
+  card("tide", "tide_2b", "海崖守将", "Cliff Warden", 2, 0, 0, "castle_defense", "在城堡或要塞防守时战力 +1 并获得 1 剑。", "When defending a Castle or Stronghold, gain +1 strength and 1 sword."),
   card("tide", "tide_1a", "孤帆女王", "Queen of the Lone Sail", 1, 0, 0, "solo_icons", "若本方没有支援，获得 2 剑与 1 城堡。", "If you receive no support, gain 2 swords and 1 fortification."),
   card("tide", "tide_1b", "礁石猎手", "Reef Hunter", 1, 1),
   card("tide", "tide_0", "淹神祭司", "Drowned Oracle", 0, 0, 0, "reselect_card", "支付 2 威望，弃掉此牌并改选另一张领袖牌。", "Pay 2 power to discard this card and choose another leader card."),

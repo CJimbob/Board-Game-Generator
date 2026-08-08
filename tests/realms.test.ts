@@ -118,6 +118,24 @@ test("an offline seat can be entrusted to AI and recovered later", () => {
   assert.match(state.log.at(-1) ?? "", /恢复码/);
 });
 
+test("a failed frontier defense applies the Wildling card to every participating faction", () => {
+  const { state, host } = createRealmState("WILD", "守境者", 2);
+  state.players.forEach((player) => { player.isBot = false; });
+  startRealmGame(state, host.id);
+  state.phase = "wildling_bid";
+  state.wildlingThreat = 12;
+  state.wildlingDeck = ["mammoths", ...state.wildlingDeck.filter((card) => card !== "mammoths")];
+  state.bid = { kind: "wildling", bids: Object.fromEntries(state.players.map((player) => [player.id, null])) };
+  const before = Object.fromEntries(state.players.map((player) => [player.id, Object.values(state.areas).flatMap((area) => area.units).filter((unit) => unit.faction === player.faction).length]));
+  submitRealmBid(state, state.players[0].id, 3);
+  submitRealmBid(state, state.players[1].id, 2);
+  submitRealmBid(state, state.players[2].id, 1);
+  const after = Object.fromEntries(state.players.map((player) => [player.id, Object.values(state.areas).flatMap((area) => area.units).filter((unit) => unit.faction === player.faction).length]));
+  assert.equal(after[state.players[0].id], before[state.players[0].id] - 2);
+  assert.equal(after[state.players[1].id], before[state.players[1].id] - 2);
+  assert.equal(after[state.players[2].id], before[state.players[2].id] - 3);
+});
+
 function stalledState(state: RealmState) {
   return `AI stalled in ${state.phase}, round ${state.round}, current ${state.currentPlayerId ?? "none"}`;
 }

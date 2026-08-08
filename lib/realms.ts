@@ -60,6 +60,7 @@ type RealmBidState = {
   kind: "influence" | "wildling";
   track?: "throne" | "fiefdom" | "court";
   bids: Record<string, number | null>;
+  excludedPlayerIds?: string[];
 };
 
 type RealmTieBreakState = {
@@ -93,6 +94,7 @@ export type RealmCombat = {
   leaderConfirmed: string[];
   blockedLeaderKeys: Record<string, string[]>;
   cancelResolved: boolean;
+  immediateEffectsResolved: boolean;
   bladeFaction: string | null;
   bladeUsed: boolean;
   tide: Record<string, { strength: number; sword: number; skull: boolean }>;
@@ -422,13 +424,22 @@ function orderInventoryValid(orders: RealmOrderType[]) {
   return Object.entries(REALM_ORDER_COUNTS).every(([order, maximum]) => orders.filter((candidate) => candidate === order).length <= maximum);
 }
 
+function eligibleOrderCapacity(state: RealmState, faction: string) {
+  const allowed = (Object.entries(REALM_ORDER_COUNTS) as [RealmOrderType, number][]).filter(([order]) => !orderForbidden(state, order));
+  const regular = allowed.filter(([order]) => !orderIsStar(order)).reduce((sum, [, count]) => sum + count, 0);
+  const special = allowed.filter(([order]) => orderIsStar(order)).reduce((sum, [, count]) => sum + count, 0);
+  return regular + Math.min(starAllowance(state, faction), special);
+}
+
 export function submitRealmOrders(state: RealmState, playerId: string, orders: Record<string, RealmOrderType>) {
   if (state.phase !== "planning") throw new Error("现在不是秘密下令阶段。 ");
   const player = requirePlayer(state, playerId);
   const faction = requireFaction(player);
   const areas = factionAreasWithUnits(state, faction);
-  if (Object.keys(orders).length !== areas.length || areas.some((area) => !orders[area.key])) {
-    throw new Error("每个有部队的区域都必须放置一枚命令。 ");
+  const areaKeys = new Set(areas.map((area) => area.key));
+  const required = Math.min(areas.length, eligibleOrderCapacity(state, faction));
+  if (Object.keys(orders).length !== required || Object.keys(orders).some((key) => !areaKeys.has(key))) {
+    throw new Error(areas.length > required ? `命令不足时必须放置全部 ${required} 枚可用命令。 ` : "每个有部队的区域都必须放置一枚命令。 ");
   }
   const submittedOrders = Object.values(orders);
   if (!orderInventoryValid(submittedOrders)) throw new Error("使用的命令标记超过了拥有数量。 ");
@@ -719,6 +730,7 @@ function createCombat(state: RealmState, sourceAreaId: string, targetAreaId: str
     leaderConfirmed: [],
     blockedLeaderKeys: { [attackerFaction]: [], [defenderFaction]: [] },
     cancelResolved: false,
+    immediateEffectsResolved: false,
     bladeFaction: null,
     bladeUsed: false,
     tide: { [attackerFaction]: tideCard(), [defenderFaction]: tideCard() },
@@ -914,10 +926,11 @@ export function resolveRealmBlade(state: RealmState, playerId: string, use: bool
 }
 
 function supportStrength(state: RealmState, combat: RealmCombat, side: "attacker" | "defender", leaderEffect: string, opposingLeaderEffect: string) {
+  const cancelFaction = [combat.attackerFaction, combat.defenderFaction].find((faction) => realmLeader(combat.leaderChoices[faction]!)?.effect === "cancel_ship_support");
   return Object.entries(combat.supportChoices).reduce((sum, [areaId, choice]) => {
     if (choice !== side) return sum;
     const order = state.areas[areaId].order!;
-    const units = state.areas[areaId].units.filter((unit) => !(opposingLeaderEffect === "cancel_ship_support" && unit.type === "ship"));
+    const units = state.areas[areaId].units.filter((unit) => !(unit.type === "ship" && (opposingLeaderEffect === "cancel_ship_support" || cancelFaction && unit.faction !== cancelFaction)));
     return sum + units.reduce((total, unit) => total + unitStrength(unit, Boolean(realmArea(combat.targetAreaId)?.castle), leaderEffect, side === "attacker"), 0) + orderModifier(order);
   }, 0);
 }
@@ -931,6 +944,12 @@ function leaderIcons(state: RealmState, combat: RealmCombat, faction: string) {
     if (!Object.values(combat.supportChoices).includes(side)) { swords += 2; forts += 1; }
   }
   if (leader.effect === "home_defense" && faction === combat.defenderFaction && realmArea(combat.targetAreaId)?.homeOf === faction) forts += 1;
+  if (leader.effect === "castle_defense" && faction === combat.defenderFaction && realmArea(combat.targetAreaId)?.castle) swords += 1;
+  if (leader.effect === "stance_icon") {
+    if (faction === combat.attackerFaction) swords += 1;
+    else forts += 1;
+  }
+  if (leader.effect === "discard_synergy" && factionPlayer(state, faction)?.leaderDiscard.includes(`${faction}_4`)) swords += 1;
   return { swords, forts };
 }
 
@@ -940,7 +959,9 @@ function combatStrength(state: RealmState, combat: RealmCombat, faction: string)
   const opponentFaction = attacking ? combat.defenderFaction : combat.attackerFaction;
   const opponentLeader = realmLeader(combat.leaderChoices[opponentFaction]!)!;
   const targetDefinition = realmArea(combat.targetAreaId)!;
-  const units = attacking ? combat.attackingUnits : state.areas[combat.targetAreaId].units.filter((unit) => unit.faction === faction);
+  const cancelFaction = [combat.attackerFaction, combat.defenderFaction].find((candidate) => realmLeader(combat.leaderChoices[candidate]!)?.effect === "cancel_ship_support");
+  const units = (attacking ? combat.attackingUnits : state.areas[combat.targetAreaId].units.filter((unit) => unit.faction === faction))
+    .filter((unit) => !(unit.type === "ship" && cancelFaction && unit.faction !== cancelFaction));
   let total = units.reduce((sum, unit) => sum + unitStrength(unit, Boolean(targetDefinition.castle), leader.effect, attacking), 0);
   if (attacking) total += orderModifier(combat.marchOrder);
   else {
@@ -955,6 +976,9 @@ function combatStrength(state: RealmState, combat: RealmCombat, faction: string)
   total += opponentLeader.effect === "enemy_card_zero" ? 0 : leader.strength;
   total += combat.tide[faction]?.strength ?? 0;
   if (combat.bladeUsed && combat.bladeFaction === faction) total += 1;
+  if (leader.effect === "throne_rival" && state.influence.throne.indexOf(opponentFaction) < state.influence.throne.indexOf(faction)) total += 1;
+  if (leader.effect === "discard_synergy" && factionPlayer(state, faction)?.leaderDiscard.includes(`${faction}_4`)) total += 1;
+  if (leader.effect === "castle_defense" && !attacking && targetDefinition.castle) total += 1;
   return total;
 }
 
@@ -970,8 +994,22 @@ function resolveCombatStrength(state: RealmState) {
   const combat = state.pendingCombat!;
   const attackerLeader = realmLeader(combat.leaderChoices[combat.attackerFaction]!)!;
   const defenderLeader = realmLeader(combat.leaderChoices[combat.defenderFaction]!)!;
-  if (attackerLeader.effect === "destroy_footman") destroyImmediateFootman(combat, state, combat.defenderFaction);
-  if (defenderLeader.effect === "destroy_footman") destroyImmediateFootman(combat, state, combat.attackerFaction);
+  if (!combat.immediateEffectsResolved) {
+    combat.immediateEffectsResolved = true;
+    if (attackerLeader.effect === "destroy_footman" && defenderLeader.effect !== "no_casualties") destroyImmediateFootman(combat, state, combat.defenderFaction);
+    if (defenderLeader.effect === "destroy_footman" && attackerLeader.effect !== "no_casualties") destroyImmediateFootman(combat, state, combat.attackerFaction);
+    for (const faction of [combat.attackerFaction, combat.defenderFaction]) {
+      const leader = realmLeader(combat.leaderChoices[faction]!)!;
+      const opponent = faction === combat.attackerFaction ? combat.defenderFaction : combat.attackerFaction;
+      if (leader.effect === "move_influence_bottom") {
+        state.influence.fiefdom = [...state.influence.fiefdom.filter((candidate) => candidate !== opponent), opponent];
+      }
+      if (leader.effect === "remove_adjacent_order") {
+        const target = REALM_AREAS.find((area) => area.key !== combat.sourceAreaId && realmArea(combat.targetAreaId)?.adjacent.includes(area.key) && realmAreaOwner(state, area.key) === opponent && state.areas[area.key].order);
+        if (target) state.areas[target.key].order = null;
+      }
+    }
+  }
   if (attackerLeader.effect === "remove_defense" || defenderLeader.effect === "remove_defense") {
     if (state.areas[combat.targetAreaId].order && orderFamily(state.areas[combat.targetAreaId].order!) === "defend") state.areas[combat.targetAreaId].order = null;
   }
@@ -1100,22 +1138,27 @@ function finishCombat(state: RealmState, retreatAreaId: string | null) {
   const winnerPlayer = factionPlayer(state, combat.winnerFaction!)!;
   const winnerLeader = combat.winnerFaction === combat.attackerFaction ? attackerLeader : defenderLeader;
   if (winnerLeader.effect === "win_power") winnerPlayer.power = Math.min(20, winnerPlayer.power + (winnerLeader.strength >= 4 ? 2 : 1));
-  if (winnerLeader.effect === "recover_cards") {
-    winnerPlayer.leaderHand.push(...winnerPlayer.leaderDiscard);
-    winnerPlayer.leaderDiscard = [];
-  }
   const loserPlayer = factionPlayer(state, combat.loserFaction!)!;
-  if (winnerLeader.effect === "discard_enemy_card" && loserPlayer.leaderHand.length) {
-    const discarded = loserPlayer.leaderHand[Math.floor(Math.random() * loserPlayer.leaderHand.length)];
-    discardLeader(loserPlayer, discarded);
+  const loserLeader = combat.loserFaction === combat.attackerFaction ? attackerLeader : defenderLeader;
+  if (loserLeader.effect === "recover_cards") {
+    loserPlayer.leaderHand.push(...loserPlayer.leaderDiscard);
+    loserPlayer.leaderDiscard = [];
   }
-  if (winnerLeader.effect === "move_influence_bottom") {
-    const track = state.influence.throne;
-    state.influence.throne = [...track.filter((faction) => faction !== combat.loserFaction), combat.loserFaction!];
+  for (const [faction, leader] of [[combat.attackerFaction, attackerLeader], [combat.defenderFaction, defenderLeader]] as const) {
+    if (leader.effect !== "discard_enemy_card") continue;
+    const opponent = factionPlayer(state, faction === combat.attackerFaction ? combat.defenderFaction : combat.attackerFaction)!;
+    if (opponent.leaderHand.length) discardLeader(opponent, opponent.leaderHand[Math.floor(Math.random() * opponent.leaderHand.length)]);
   }
   if (winnerLeader.effect === "remove_order") {
     const target = REALM_AREAS.find((area) => realmAreaOwner(state, area.key) === combat.loserFaction && state.areas[area.key].order);
     if (target) state.areas[target.key].order = null;
+  }
+  if (winnerLeader.effect === "upgrade_after_win" && unitsOnBoard(state, combat.winnerFaction!, "knight") < UNIT_LIMITS.knight) {
+    const supportAreaIds = Object.entries(combat.supportChoices).filter(([, side]) => side === (combat.winnerFaction === combat.attackerFaction ? "attacker" : "defender")).map(([areaId]) => areaId);
+    const allowedAreas = new Set([combat.sourceAreaId, combat.targetAreaId, ...supportAreaIds]);
+    const area = REALM_AREAS.find((definition) => allowedAreas.has(definition.key) && state.areas[definition.key].units.some((unit) => unit.faction === combat.winnerFaction && unit.type === "footman"));
+    const footman = area && state.areas[area.key].units.find((unit) => unit.faction === combat.winnerFaction && unit.type === "footman");
+    if (footman) footman.type = "knight";
   }
   if (!combat.keepMarchOrder || !state.areas[combat.sourceAreaId].units.some((unit) => unit.faction === combat.attackerFaction)) {
     state.areas[combat.sourceAreaId].order = null;
@@ -1377,10 +1420,10 @@ function startInfluenceBid(state: RealmState, track: "throne" | "fiefdom" | "cou
   state.currentPlayerId = null;
 }
 
-function startWildlingBid(state: RealmState, fromThreat: boolean) {
+function startWildlingBid(state: RealmState, fromThreat: boolean, excludedPlayerIds: string[] = []) {
   if (!fromThreat && state.wildlingThreat === 0) state.wildlingThreat = 2;
   state.phase = "wildling_bid";
-  state.bid = { kind: "wildling", bids: Object.fromEntries(state.players.map((player) => [player.id, null])) };
+  state.bid = { kind: "wildling", excludedPlayerIds, bids: Object.fromEntries(state.players.map((player) => [player.id, excludedPlayerIds.includes(player.id) ? 0 : null])) };
   state.currentPlayerId = null;
 }
 
@@ -1396,40 +1439,90 @@ function finishInfluenceBid(state: RealmState, rankedFactions: string[]) {
   else continueEvents(state);
 }
 
+function removeWildlingUnits(state: RealmState, player: RealmPlayerState, count: number) {
+  const candidates = REALM_AREAS.flatMap((definition) => state.areas[definition.key].units.map((unit) => ({ definition, unit })))
+    .filter(({ unit }) => unit.faction === player.faction)
+    .sort((a, b) => REALM_UNIT_STRENGTH[a.unit.type] - REALM_UNIT_STRENGTH[b.unit.type]);
+  const ids = candidates.slice(0, count).map(({ unit }) => unit.id);
+  for (const area of Object.values(state.areas)) area.units = area.units.filter((unit) => !ids.includes(unit.id));
+}
+
+function changeWildlingUnits(state: RealmState, player: RealmPlayerState, from: RealmUnitType, to: RealmUnitType, count: number, destroyIfUnavailable = false) {
+  const faction = requireFaction(player);
+  const units = Object.values(state.areas).flatMap((area) => area.units).filter((unit) => unit.faction === faction && unit.type === from).slice(0, count);
+  for (const unit of units) {
+    if (unitsOnBoard(state, faction, to) < UNIT_LIMITS[to]) unit.type = to;
+    else if (destroyIfUnavailable) for (const area of Object.values(state.areas)) area.units = area.units.filter((candidate) => candidate.id !== unit.id);
+  }
+}
+
+function moveFactionToTrackEnd(state: RealmState, faction: string, track: "throne" | "fiefdom" | "court") {
+  state.influence[track] = [...state.influence[track].filter((candidate) => candidate !== faction), faction];
+}
+
+function moveFactionToTrackTop(state: RealmState, faction: string, track: "throne" | "fiefdom" | "court") {
+  state.influence[track] = [faction, ...state.influence[track].filter((candidate) => candidate !== faction)];
+}
+
+function discardWildlingLeaders(player: RealmPlayerState, allHighest: boolean) {
+  if (player.leaderHand.length <= 1) return;
+  const sorted = player.leaderHand.map((key) => realmLeader(key)!).sort((a, b) => b.strength - a.strength);
+  const selected = allHighest ? sorted.filter((card) => card.strength === sorted[0].strength) : [sorted.at(-1)!];
+  const keys = selected.map((card) => card.key);
+  player.leaderHand = player.leaderHand.filter((key) => !keys.includes(key));
+  player.leaderDiscard.push(...keys);
+}
+
 function applyWildlingOutcome(state: RealmState, rankedFactions: string[]) {
   const bid = state.bid!;
   const ranked = rankedFactions.map((faction) => factionPlayer(state, faction)!);
   const total = Object.values(bid.bids).reduce<number>((sum, value) => sum + (value ?? 0), 0);
-  for (const player of state.players) player.power -= bid.bids[player.id] ?? 0;
+  for (const player of state.players) if (!bid.excludedPlayerIds?.includes(player.id)) player.power -= bid.bids[player.id] ?? 0;
   const card = state.wildlingDeck.shift() ?? "horde";
   state.wildlingDeck.push(card);
   const watchWins = total >= state.wildlingThreat;
+  const highest = ranked[0];
+  const lowest = ranked.at(-1)!;
   if (watchWins) {
-    ranked[0].power = Math.min(20, ranked[0].power + 2);
-    addLog(state, `众势力以 ${total} 威望击退荒境军势，${ranked[0].name}贡献最高。`);
-  } else {
-    const lowest = ranked.at(-1)!;
-    if (card === "king") {
-      for (const track of ["throne", "fiefdom", "court"] as const) state.influence[track] = [...state.influence[track].filter((faction) => faction !== lowest.faction), lowest.faction!];
-    } else if (card === "silence") {
-      lowest.leaderDiscard.push(...lowest.leaderHand);
-      lowest.leaderHand = [];
-      if (lowest.leaderDiscard.length) {
-        const keep = lowest.leaderDiscard.at(-1)!;
-        lowest.leaderHand = lowest.leaderDiscard.filter((key) => key !== keep);
-        lowest.leaderDiscard = [keep];
-      }
-    } else if (card === "climbers") lowest.supply = Math.max(0, lowest.supply - 2);
-    else if (card === "raiders") lowest.power = 0;
-    else {
-      const candidates = Object.values(state.areas).flatMap((area) => area.units).filter((unit) => unit.faction === lowest.faction).slice(0, 2).map((unit) => unit.id);
-      for (const area of Object.values(state.areas)) area.units = area.units.filter((unit) => !candidates.includes(unit.id));
+    if (card === "mammoths" && highest.leaderDiscard.length) {
+      const recovered = highest.leaderDiscard.map((key) => realmLeader(key)!).sort((a, b) => b.strength - a.strength)[0];
+      highest.leaderDiscard = highest.leaderDiscard.filter((key) => key !== recovered.key);
+      highest.leaderHand.push(recovered.key);
+    } else if (card === "climbers") changeWildlingUnits(state, highest, "footman", "knight", 2);
+    else if (card === "raiders") highest.supply = Math.min(6, highest.supply + 1);
+    else if (card === "king") moveFactionToTrackTop(state, requireFaction(highest), "throne");
+    else if (card === "horde") {
+      const castle = REALM_AREAS.find((area) => area.castle && realmAreaOwner(state, area.key) === highest.faction);
+      if (castle) applyMusterChoices(state, highest, botMusterChoices(state, highest, castle.key), castle.key);
+    } else if (card === "scouts") {
+      for (const player of ranked) player.power = Math.min(20, player.power + (bid.bids[player.id] ?? 0));
+    } else if (card === "cold") {
+      highest.leaderHand.push(...highest.leaderDiscard);
+      highest.leaderDiscard = [];
     }
+    addLog(state, `众势力以 ${total} 威望击退荒境军势，${highest.name}获得最高贡献奖励。`);
+  } else {
+    if (card === "king") {
+      for (const track of ["throne", "fiefdom", "court"] as const) moveFactionToTrackEnd(state, requireFaction(lowest), track);
+      for (const player of ranked.slice(0, -1)) moveFactionToTrackEnd(state, requireFaction(player), "fiefdom");
+    } else if (card === "mammoths") ranked.forEach((player) => removeWildlingUnits(state, player, player.id === lowest.id ? 3 : 2));
+    else if (card === "horde") ranked.forEach((player) => removeWildlingUnits(state, player, player.id === lowest.id ? 2 : 1));
+    else if (card === "climbers") ranked.forEach((player) => changeWildlingUnits(state, player, "knight", "footman", 2, true));
+    else if (card === "raiders") ranked.forEach((player) => { player.supply = Math.max(0, player.supply - (player.id === lowest.id ? 2 : 1)); });
+    else if (card === "scouts") ranked.forEach((player) => { player.power = player.id === lowest.id ? 0 : Math.max(0, player.power - 2); });
+    else if (card === "cold") ranked.forEach((player) => discardWildlingLeaders(player, player.id === lowest.id));
+    else if (card === "giants") removeWildlingUnits(state, lowest, 2);
     addLog(state, `荒境军势突破防线；${lowest.name}承受最严重后果。`);
   }
-  state.wildlingThreat = 0;
+  const repeatAttack = watchWins && card === "giants";
+  state.wildlingThreat = repeatAttack ? 6 : 0;
   state.bid = null;
   state.tieBreak = null;
+  if (repeatAttack) {
+    addLog(state, `荒境先遣被击退，但一支强度 6 的军势立即再度来袭；${highest.name}不参与本次防守。`);
+    startWildlingBid(state, true, [highest.id]);
+    return;
+  }
   continueEvents(state);
 }
 
@@ -1441,7 +1534,7 @@ function finishResolvedBid(state: RealmState, rankedFactions: string[]) {
 function beginBidResolution(state: RealmState) {
   const bid = state.bid!;
   const byAmount = new Map<number, string[]>();
-  for (const player of state.players) {
+  for (const player of state.players.filter((candidate) => !bid.excludedPlayerIds?.includes(candidate.id))) {
     const amount = bid.bids[player.id] ?? 0;
     byAmount.set(amount, [...(byAmount.get(amount) ?? []), requireFaction(player)]);
   }
@@ -1485,6 +1578,7 @@ export function chooseRealmBidTie(state: RealmState, playerId: string, faction: 
 export function submitRealmBid(state: RealmState, playerId: string, amount: number) {
   if (!state.bid || !["influence_bid", "wildling_bid"].includes(state.phase)) throw new Error("现在没有秘密竞价。 ");
   const player = requirePlayer(state, playerId);
+  if (state.bid.excludedPlayerIds?.includes(playerId)) throw new Error("你不参与本次荒境竞价。 ");
   const value = Math.max(0, Math.floor(amount));
   if (value > player.power) throw new Error("竞价不能超过可用威望。 ");
   state.bid.bids[playerId] = value;
@@ -1519,6 +1613,7 @@ function botOrders(state: RealmState, player: RealmPlayerState) {
       : castle ? ["power_star", "power", "support_star", "support", "defend"] : ["power", "support", "raid", "march_minus"];
     let picked = preferences.find((order) => available.includes(order) && (!orderIsStar(order) || starsLeft > 0));
     if (!picked) picked = available.find((order) => !orderIsStar(order) || starsLeft > 0)!;
+    if (!picked) break;
     result[area.key] = picked;
     available.splice(available.indexOf(picked), 1);
     if (orderIsStar(picked)) starsLeft -= 1;
