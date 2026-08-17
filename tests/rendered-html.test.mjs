@@ -28,6 +28,7 @@ test("ships the separate game hub, city game, and social preview", async () => {
   assert.match(client, /2–8 人/);
   assert.match(client, /chooseRole/);
   assert.match(client, /返回牌桌，查看资源与历史/);
+  assert.match(client, /别人行动时可查看/);
   assert.match(client, /继续选角色/);
   assert.match(client, /本轮角色行动/);
   assert.match(client, /本轮行动/);

@@ -76,8 +76,11 @@ test("keeps unrevealed opponent identities private", () => {
   finishDraft(state);
   const hostView = publicGameView(state, host.id);
   const opponentView = hostView.players.find((player) => player.id === second.id)!;
+  const ownView = hostView.players.find((player) => player.id === host.id)!;
   assert.ok(opponentView.roleKeys.length <= 1);
-  assert.equal(hostView.players.find((player) => player.id === host.id)?.roleKeys.length, 2);
+  assert.equal(ownView.roleKeys.length, 2);
+  assert.equal(ownView.hand.length, host.hand.length);
+  assert.equal(opponentView.hand.length, 0);
   assert.match(hostView.roundLog[0], /第 1 轮开始/);
   assert.ok(hostView.roundLog.some((entry) => entry.includes("秘密选好角色")));
   assert.equal(hostView.assassinatedRoleKey, null);

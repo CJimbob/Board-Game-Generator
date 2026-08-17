@@ -545,9 +545,10 @@ button:disabled { cursor: not-allowed; opacity: 0.46; }
 .my-role span { font-family: "Songti SC", "STSong", Georgia, serif; font-size: 1.1rem; font-weight: 900; }
 .my-role small { display: block; max-width: 15rem; color: var(--ink-soft); font: 400 .65rem/1.45 system-ui, sans-serif; margin-top: .25rem; }
 
-.spectator-message { min-height: 15rem; display: grid; place-items: center; align-content: center; color: #8e816d; }
+.spectator-message { min-height: 8rem; display: grid; place-items: center; align-content: center; color: #8e816d; }
 .spectator-message span { color: #b58d4a; font-size: 3.2rem; }
 .spectator-message p { margin: .7rem; }
+.waiting-hand { border-top: 1px solid var(--line); }
 
 .action-board { padding: 1.4rem 0 2rem; }
 .resource-actions { display: flex; align-items: center; gap: .7rem; padding: 1rem; border: 1px solid var(--line); background: rgba(255,255,255,.42); }
