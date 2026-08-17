@@ -16,7 +16,10 @@ export function HomeClient() {
       return;
     }
     const saved = window.localStorage.getItem("crown-city-language") ?? window.localStorage.getItem("six-realms-language");
-    if (saved === "en") setLanguage("en");
+    if (saved === "en") {
+      const timer = window.setTimeout(() => setLanguage("en"), 0);
+      return () => window.clearTimeout(timer);
+    }
   }, []);
 
   function changeLanguage() {
